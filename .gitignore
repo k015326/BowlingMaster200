@@ -1,0 +1,17 @@
+﻿# Build files
+/build
+app/build
+.gradle
+
+# IDE files
+.idea/caches
+.idea/shelf
+.idea/workspace.xml
+.idea/deploymentTargetSelector.xml
+.idea/deviceManager.xml
+.idea/markdown.xml
+.idea/misc.xml
+.idea/runConfigurations.xml
+
+# Local properties
+local.properties
