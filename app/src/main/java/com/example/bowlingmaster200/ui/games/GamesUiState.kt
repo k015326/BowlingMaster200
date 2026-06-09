@@ -24,6 +24,8 @@ data class GamesUiState(
     val validationError: String? = null,
     val saveMessage: String? = null,
     val isSaving: Boolean = false,
+    val selectedFrameIndex: Int = 0,
+    val selectedRollIndex: Int = 0,
 ) {
     companion object {
         fun initial(): GamesUiState {
