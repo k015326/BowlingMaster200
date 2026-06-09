@@ -14,7 +14,10 @@ class BowlingScoreCalculatorTest {
 
     @Test
     fun perfectGame_scores300() {
-        val frames = List(Frame.FRAME_COUNT) { Frame(firstRoll = Roll.MAX_PINS) }
+        val frames = buildFrames(
+            *Array(9) { Frame(firstRoll = Roll.MAX_PINS) },
+            Frame(firstRoll = Roll.MAX_PINS, secondRoll = Roll.MAX_PINS, bonusRoll = Roll.MAX_PINS),
+        )
         assertEquals(300, BowlingScoreCalculator.calculateTotalScore(frames))
     }
 
@@ -72,12 +75,12 @@ class BowlingScoreCalculatorTest {
 
     @Test
     fun tenthFrame_spareFinish() {
-        // 9 frames gutter, 10th 7/ 3 = 17
+        // 9 frames gutter, 10th 7/ 3 = 13 (7+3+3)
         val frames = buildFrames(
             *Array(9) { Frame(firstRoll = 0, secondRoll = 0) },
             Frame(firstRoll = 7, secondRoll = 3, bonusRoll = 3),
         )
-        assertEquals(17, BowlingScoreCalculator.calculateTotalScore(frames))
+        assertEquals(13, BowlingScoreCalculator.calculateTotalScore(frames))
     }
 
     @Test
