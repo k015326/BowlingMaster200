@@ -12,15 +12,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
 @Composable
 fun FrameInputRow(
     frame: FrameInputUiState,
+    selectedFrameIndex: Int,
+    selectedRollIndex: Int,
     onFirstRollChange: (String) -> Unit,
     onSecondRollChange: (String) -> Unit,
     onBonusRollChange: (String) -> Unit,
+    onCellSelected: (rollIndex: Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val disableSecondRoll = !frame.isTenthFrame && frame.isStrikeFirstRoll
@@ -42,6 +46,7 @@ fun FrameInputRow(
             label = "1st",
             value = frame.firstRollText,
             onValueChange = onFirstRollChange,
+            onSelect = { onCellSelected(0) },
         )
 
         RollTextField(
@@ -49,6 +54,7 @@ fun FrameInputRow(
             value = if (disableSecondRoll) "" else frame.secondRollText,
             onValueChange = onSecondRollChange,
             enabled = !disableSecondRoll,
+            onSelect = { onCellSelected(1) },
         )
 
         if (showBonusRoll) {
@@ -56,6 +62,7 @@ fun FrameInputRow(
                 label = "3rd",
                 value = frame.bonusRollText,
                 onValueChange = onBonusRollChange,
+                onSelect = { onCellSelected(2) },
             )
         } else {
             Text(text = "", modifier = Modifier.width(72.dp))
@@ -73,6 +80,7 @@ private fun RollTextField(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
+    onSelect: () -> Unit,
     enabled: Boolean = true,
 ) {
     OutlinedTextField(
@@ -81,7 +89,13 @@ private fun RollTextField(
         label = { Text(label) },
         enabled = enabled,
         singleLine = true,
-        modifier = Modifier.width(72.dp),
+        modifier = Modifier
+            .width(72.dp)
+            .onFocusChanged { focusState ->
+                if (focusState.isFocused) {
+                    onSelect()
+                }
+            },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
     )
 }
