@@ -1,12 +1,15 @@
 package com.example.bowlingmaster200.ui.games
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +32,7 @@ fun FrameInputRow(
 ) {
     val disableSecondRoll = !frame.isTenthFrame && frame.isStrikeFirstRoll
     val showBonusRoll = frame.isTenthFrame
+    val isThisFrameSelected = selectedFrameIndex == frame.frameIndex - 1
 
     Row(
         modifier = modifier
@@ -47,6 +51,7 @@ fun FrameInputRow(
             value = frame.firstRollText,
             onValueChange = onFirstRollChange,
             onSelect = { onCellSelected(0) },
+            isSelected = isThisFrameSelected && selectedRollIndex == 0,
         )
 
         RollTextField(
@@ -55,6 +60,7 @@ fun FrameInputRow(
             onValueChange = onSecondRollChange,
             enabled = !disableSecondRoll,
             onSelect = { onCellSelected(1) },
+            isSelected = isThisFrameSelected && selectedRollIndex == 1,
         )
 
         if (showBonusRoll) {
@@ -63,6 +69,7 @@ fun FrameInputRow(
                 value = frame.bonusRollText,
                 onValueChange = onBonusRollChange,
                 onSelect = { onCellSelected(2) },
+                isSelected = isThisFrameSelected && selectedRollIndex == 2,
             )
         } else {
             Text(text = "", modifier = Modifier.width(72.dp))
@@ -81,8 +88,19 @@ private fun RollTextField(
     value: String,
     onValueChange: (String) -> Unit,
     onSelect: () -> Unit,
+    isSelected: Boolean = false,
     enabled: Boolean = true,
 ) {
+    val selectionBorder = if (isSelected) {
+        Modifier.border(
+            width = 2.dp,
+            color = MaterialTheme.colorScheme.primary,
+            shape = RoundedCornerShape(4.dp),
+        )
+    } else {
+        Modifier
+    }
+
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -91,6 +109,8 @@ private fun RollTextField(
         singleLine = true,
         modifier = Modifier
             .width(72.dp)
+            .then(selectionBorder)
+            .padding(if (isSelected) 2.dp else 0.dp)
             .onFocusChanged { focusState ->
                 if (focusState.isFocused) {
                     onSelect()

@@ -135,17 +135,24 @@ class GamesViewModel(
             deleteInput()
             return
         }
-        if (key.length != 1 || key[0] !in '1'..'9') return
 
-        val digit = key.toInt()
+        val resolvedText = resolveKeypadKey(key) ?: return
+
         _uiState.update { state ->
             val frameIndex = state.selectedFrameIndex
             val rollIndex = state.selectedRollIndex
             if (!isCellEditable(state.frames, frameIndex, rollIndex)) return@update state
-            if (!isValidKeypadDigit(state.frames, frameIndex, rollIndex, digit)) return@update state
+            if (!isValidKeypadKey(state.frames, frameIndex, rollIndex, key, resolvedText)) {
+                return@update state
+            }
 
             val frames = state.frames.toMutableList()
-            setRollText(frames, frameIndex, rollIndex, sanitizeRollInput(key))
+            val textToSet = if (key.length == 1 && key[0] in '1'..'9') {
+                sanitizeRollInput(key)
+            } else {
+                resolvedText
+            }
+            setRollText(frames, frameIndex, rollIndex, textToSet)
             val (nextFrameIndex, nextRollIndex) = moveCursorNext(frames, frameIndex, rollIndex)
             recompute(
                 state.copy(
@@ -272,6 +279,51 @@ class GamesViewModel(
                     return second + digit <= Roll.FRAME_PINS
                 }
                 true
+            }
+            else -> false
+        }
+    }
+
+    private fun resolveKeypadKey(key: String): String? {
+        return when (key) {
+            "X" -> "10"
+            "G", "F" -> "0"
+            else -> if (key.length == 1 && key[0] in '1'..'9') key else null
+        }
+    }
+
+    private fun isValidKeypadKey(
+        frames: List<FrameInputUiState>,
+        frameIndex: Int,
+        rollIndex: Int,
+        key: String,
+        resolvedText: String,
+    ): Boolean {
+        return when (key) {
+            "X" -> rollIndex == 0
+            "G", "F" -> isValidKeypadZero(frames, frameIndex, rollIndex)
+            else -> isValidKeypadDigit(frames, frameIndex, rollIndex, resolvedText.toInt())
+        }
+    }
+
+    private fun isValidKeypadZero(
+        frames: List<FrameInputUiState>,
+        frameIndex: Int,
+        rollIndex: Int,
+    ): Boolean {
+        val frame = frames[frameIndex]
+        return when (rollIndex) {
+            0 -> true
+            1 -> {
+                val first = frame.firstRollText.toIntOrNull() ?: return false
+                if (frameIndex < Frame.LAST_FRAME_INDEX && first == Roll.MAX_PINS) return false
+                first + Roll.MIN_PINS <= Roll.FRAME_PINS
+            }
+            2 -> {
+                if (frameIndex != Frame.LAST_FRAME_INDEX) return false
+                val first = frame.firstRollText.toIntOrNull() ?: return false
+                val second = frame.secondRollText.toIntOrNull() ?: return false
+                first == Roll.MAX_PINS || first + second == Roll.FRAME_PINS
             }
             else -> false
         }
