@@ -78,6 +78,11 @@ fun GameInputScreen(
             )
         }
 
+        ScoreKeypad(
+            onKeyPress = viewModel::onKeyInput,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
         Button(
             onClick = { viewModel.saveGame() },
             enabled = !uiState.isSaving,
