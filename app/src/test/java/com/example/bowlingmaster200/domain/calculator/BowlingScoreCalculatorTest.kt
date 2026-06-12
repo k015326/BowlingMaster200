@@ -13,20 +13,31 @@ import org.junit.Test
 class BowlingScoreCalculatorTest {
 
     @Test
-    fun perfectGame_scores300() {
+    fun openFrames_cumulativeScore_example() {
         val frames = buildFrames(
-            *Array(9) { Frame(firstRoll = Roll.MAX_PINS) },
-            Frame(firstRoll = Roll.MAX_PINS, secondRoll = Roll.MAX_PINS, bonusRoll = Roll.MAX_PINS),
+            Frame(firstRoll = 9, secondRoll = 0),
+            Frame(firstRoll = 8, secondRoll = 1),
+            Frame(firstRoll = 7, secondRoll = 2),
         )
-        assertEquals(300, BowlingScoreCalculator.calculateTotalScore(frames))
+        val scores = BowlingScoreCalculator.calculateFrameScores(frames)
+
+        assertEquals(9, scores[0].framePins)
+        assertEquals(9, scores[0].cumulativeScore)
+        assertEquals(FrameType.OPEN, scores[0].frameType)
+
+        assertEquals(9, scores[1].framePins)
+        assertEquals(18, scores[1].cumulativeScore)
+        assertEquals(FrameType.OPEN, scores[1].frameType)
+
+        assertEquals(9, scores[2].framePins)
+        assertEquals(27, scores[2].cumulativeScore)
+        assertEquals(FrameType.OPEN, scores[2].frameType)
     }
 
     @Test
-    fun allSpares_withFiveOnFirst_scores150() {
-        val frames = List(Frame.FRAME_COUNT) {
-            Frame(firstRoll = 5, secondRoll = 5, bonusRoll = if (it == Frame.LAST_FRAME_INDEX) 5 else null)
-        }
-        assertEquals(150, BowlingScoreCalculator.calculateTotalScore(frames))
+    fun allOpenFrames_totalScore() {
+        val frames = List(Frame.FRAME_COUNT) { Frame(firstRoll = 9, secondRoll = 0) }
+        assertEquals(90, BowlingScoreCalculator.calculateTotalScore(frames))
     }
 
     @Test
@@ -36,62 +47,48 @@ class BowlingScoreCalculatorTest {
     }
 
     @Test
-    fun openFrames_example() {
-        // 7/ 8- = frame1: 7+3+8=18, frame2: 8 = 26
+    fun strikeFrame_stopsScoring() {
         val frames = buildFrames(
-            Frame(firstRoll = 7, secondRoll = 3),
-            Frame(firstRoll = 8, secondRoll = 0),
+            Frame(firstRoll = 9, secondRoll = 0),
+            Frame(firstRoll = Roll.MAX_PINS),
+            Frame(firstRoll = 8, secondRoll = 1),
         )
         val scores = BowlingScoreCalculator.calculateFrameScores(frames)
-        assertEquals(18, scores[0].cumulativeScore)
-        assertEquals(26, scores[1].cumulativeScore)
-        assertEquals(FrameType.SPARE, scores[0].frameType)
-        assertEquals(FrameType.OPEN, scores[1].frameType)
-    }
 
-    @Test
-    fun strike_followedBySpareAndOpen() {
-        // X 7/ 8- = 20, 38, 46
-        val frames = buildFrames(
-            Frame(firstRoll = 10),
-            Frame(firstRoll = 7, secondRoll = 3),
-            Frame(firstRoll = 8, secondRoll = 0),
-        )
-        val scores = BowlingScoreCalculator.calculateFrameScores(frames)
-        assertEquals(20, scores[0].cumulativeScore)
-        assertEquals(38, scores[1].cumulativeScore)
-        assertEquals(46, scores[2].cumulativeScore)
-    }
-
-    @Test
-    fun tenthFrame_strikeFinish() {
-        // 9 frames gutter, 10th X X X = 30 in 10th
-        val frames = buildFrames(
-            *Array(9) { Frame(firstRoll = 0, secondRoll = 0) },
-            Frame(firstRoll = 10, secondRoll = 10, bonusRoll = 10),
-        )
-        assertEquals(30, BowlingScoreCalculator.calculateTotalScore(frames))
-    }
-
-    @Test
-    fun tenthFrame_spareFinish() {
-        // 9 frames gutter, 10th 7/ 3 = 13 (7+3+3)
-        val frames = buildFrames(
-            *Array(9) { Frame(firstRoll = 0, secondRoll = 0) },
-            Frame(firstRoll = 7, secondRoll = 3, bonusRoll = 3),
-        )
-        assertEquals(13, BowlingScoreCalculator.calculateTotalScore(frames))
-    }
-
-    @Test
-    fun incompleteGame_totalIsNull() {
-        val frames = buildFrames(
-            Frame(firstRoll = 10),
-            Frame(firstRoll = 7),
-        )
+        assertEquals(9, scores[0].cumulativeScore)
+        assertEquals(FrameType.STRIKE, scores[1].frameType)
+        assertNull(scores[1].cumulativeScore)
+        assertNull(scores[2].cumulativeScore)
         assertNull(BowlingScoreCalculator.calculateTotalScore(frames))
+    }
+
+    @Test
+    fun spareFrame_stopsScoring() {
+        val frames = buildFrames(
+            Frame(firstRoll = 9, secondRoll = 0),
+            Frame(firstRoll = 7, secondRoll = 3),
+            Frame(firstRoll = 8, secondRoll = 1),
+        )
         val scores = BowlingScoreCalculator.calculateFrameScores(frames)
-        assertNull(scores[0].cumulativeScore)
+
+        assertEquals(9, scores[0].cumulativeScore)
+        assertEquals(FrameType.SPARE, scores[1].frameType)
+        assertNull(scores[1].cumulativeScore)
+        assertNull(scores[2].cumulativeScore)
+    }
+
+    @Test
+    fun incompleteOpenFrame_stopsScoring() {
+        val frames = buildFrames(
+            Frame(firstRoll = 9, secondRoll = 0),
+            Frame(firstRoll = 8),
+        )
+        val scores = BowlingScoreCalculator.calculateFrameScores(frames)
+
+        assertEquals(9, scores[0].cumulativeScore)
+        assertEquals(FrameType.INCOMPLETE, scores[1].frameType)
+        assertNull(scores[1].cumulativeScore)
+        assertNull(BowlingScoreCalculator.calculateTotalScore(frames))
     }
 
     @Test

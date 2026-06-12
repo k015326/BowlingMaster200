@@ -55,9 +55,6 @@ fun GameInputScreen(
                     frame = frame,
                     selectedFrameIndex = uiState.selectedFrameIndex,
                     selectedRollIndex = uiState.selectedRollIndex,
-                    onFirstRollChange = { viewModel.updateFirstRoll(frame.frameIndex, it) },
-                    onSecondRollChange = { viewModel.updateSecondRoll(frame.frameIndex, it) },
-                    onBonusRollChange = { viewModel.updateBonusRoll(it) },
                     onCellSelected = { rollIndex ->
                         viewModel.selectCell(frame.frameIndex, rollIndex)
                     },

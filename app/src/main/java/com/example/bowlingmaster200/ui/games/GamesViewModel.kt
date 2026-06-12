@@ -27,41 +27,6 @@ class GamesViewModel(
     private val _uiState = MutableStateFlow(GamesUiState.initial())
     val uiState: StateFlow<GamesUiState> = _uiState.asStateFlow()
 
-    fun updateFirstRoll(frameIndex: Int, text: String) {
-        val sanitized = sanitizeRollInput(text)
-        _uiState.update { state ->
-            val index = frameIndex - 1
-            val frames = state.frames.toMutableList()
-            val current = frames[index]
-            var updated = current.copy(firstRollText = sanitized)
-            if (!updated.isTenthFrame && updated.isStrikeFirstRoll) {
-                updated = updated.copy(secondRollText = "")
-            }
-            frames[index] = updated
-            recompute(state.copy(frames = frames, saveMessage = null))
-        }
-    }
-
-    fun updateSecondRoll(frameIndex: Int, text: String) {
-        val sanitized = sanitizeRollInput(text)
-        _uiState.update { state ->
-            val index = frameIndex - 1
-            val frames = state.frames.toMutableList()
-            frames[index] = frames[index].copy(secondRollText = sanitized)
-            recompute(state.copy(frames = frames, saveMessage = null))
-        }
-    }
-
-    fun updateBonusRoll(text: String) {
-        val sanitized = sanitizeRollInput(text)
-        _uiState.update { state ->
-            val frames = state.frames.toMutableList()
-            val index = Frame.LAST_FRAME_INDEX
-            frames[index] = frames[index].copy(bonusRollText = sanitized)
-            recompute(state.copy(frames = frames, saveMessage = null))
-        }
-    }
-
     fun saveGame() {
         val current = _uiState.value
         val domainFrames = toDomainFrames(current.frames)
@@ -147,12 +112,13 @@ class GamesViewModel(
             }
 
             val frames = state.frames.toMutableList()
-            val textToSet = if (key.length == 1 && key[0] in '1'..'9') {
-                sanitizeRollInput(key)
-            } else {
-                resolvedText
+            val textToSet = when (key) {
+                "/" -> computeSparePins(frames, frameIndex, rollIndex).toString()
+                in "1".."9" -> sanitizeRollInput(key)
+                else -> resolvedText
             }
-            setRollText(frames, frameIndex, rollIndex, textToSet)
+            val inputKey = if (key in setOf("G", "F", "-")) key else null
+            setRollText(frames, frameIndex, rollIndex, textToSet, inputKey)
             val (nextFrameIndex, nextRollIndex) = moveCursorNext(frames, frameIndex, rollIndex)
             recompute(
                 state.copy(
@@ -211,18 +177,20 @@ class GamesViewModel(
         frameIndex: Int,
         rollIndex: Int,
         text: String,
+        inputKey: String? = null,
     ) {
         val frame = frames[frameIndex]
+        val rollKey = if (text.isEmpty()) null else inputKey
         val updated = when (rollIndex) {
             0 -> {
-                var result = frame.copy(firstRollText = text)
+                var result = frame.copy(firstRollText = text, firstRollKey = rollKey)
                 if (frameIndex < Frame.LAST_FRAME_INDEX && result.isStrikeFirstRoll) {
-                    result = result.copy(secondRollText = "")
+                    result = result.copy(secondRollText = "", secondRollKey = null)
                 }
                 result
             }
-            1 -> frame.copy(secondRollText = text)
-            2 -> frame.copy(bonusRollText = text)
+            1 -> frame.copy(secondRollText = text, secondRollKey = rollKey)
+            2 -> frame.copy(bonusRollText = text, bonusRollKey = rollKey)
             else -> frame
         }
         frames[frameIndex] = updated
@@ -287,7 +255,8 @@ class GamesViewModel(
     private fun resolveKeypadKey(key: String): String? {
         return when (key) {
             "X" -> "10"
-            "G", "F" -> "0"
+            "G", "F", "-" -> "0"
+            "/" -> "/"
             else -> if (key.length == 1 && key[0] in '1'..'9') key else null
         }
     }
@@ -301,8 +270,44 @@ class GamesViewModel(
     ): Boolean {
         return when (key) {
             "X" -> rollIndex == 0
-            "G", "F" -> isValidKeypadZero(frames, frameIndex, rollIndex)
+            "G", "F", "-" -> isValidKeypadZero(frames, frameIndex, rollIndex)
+            "/" -> isValidKeypadSpare(frames, frameIndex, rollIndex)
             else -> isValidKeypadDigit(frames, frameIndex, rollIndex, resolvedText.toInt())
+        }
+    }
+
+    private fun isValidKeypadSpare(
+        frames: List<FrameInputUiState>,
+        frameIndex: Int,
+        rollIndex: Int,
+    ): Boolean {
+        val frame = frames[frameIndex]
+        return when (rollIndex) {
+            0 -> false
+            1 -> {
+                val first = frame.firstRollText.toIntOrNull() ?: return false
+                first != Roll.MAX_PINS
+            }
+            2 -> {
+                if (frameIndex != Frame.LAST_FRAME_INDEX) return false
+                val first = frame.firstRollText.toIntOrNull() ?: return false
+                val second = frame.secondRollText.toIntOrNull() ?: return false
+                first == Roll.MAX_PINS && second in 1 until Roll.MAX_PINS
+            }
+            else -> false
+        }
+    }
+
+    private fun computeSparePins(
+        frames: List<FrameInputUiState>,
+        frameIndex: Int,
+        rollIndex: Int,
+    ): Int {
+        val frame = frames[frameIndex]
+        return when (rollIndex) {
+            1 -> Roll.FRAME_PINS - frame.firstRollText.toIntOrNull()!!
+            2 -> Roll.FRAME_PINS - frame.secondRollText.toIntOrNull()!!
+            else -> error("computeSparePins called for invalid rollIndex: $rollIndex")
         }
     }
 
