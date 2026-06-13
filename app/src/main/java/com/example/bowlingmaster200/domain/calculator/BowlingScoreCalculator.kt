@@ -7,8 +7,7 @@ import com.example.bowlingmaster200.domain.model.GameScore
 import com.example.bowlingmaster200.domain.model.Roll
 
 /**
- * スコア計算エンジン（Step 4-A: オープンフレームのみ）。
- * ストライク・スペア・10Fボーナスは未対応。該当フレーム以降は未確定（累計 null）。
+ * スコア計算エンジン（Step 4-C: オープン + スペア + ストライク + 10F特殊処理）。
  */
 object BowlingScoreCalculator {
 
@@ -39,7 +38,35 @@ object BowlingScoreCalculator {
                             runningTotal
                         }
                     }
-                    FrameType.STRIKE, FrameType.SPARE, FrameType.INCOMPLETE -> {
+                    FrameType.SPARE -> {
+                        val bonusRoll = if (index >= Frame.LAST_FRAME_INDEX) {
+                            tenthFrameSpareBonusRoll(frame)
+                        } else {
+                            nextRolls(frames, index, 1)?.firstOrNull()
+                        }
+                        if (bonusRoll == null) {
+                            scoringStopped = true
+                            null
+                        } else {
+                            runningTotal += Roll.FRAME_PINS + bonusRoll
+                            runningTotal
+                        }
+                    }
+                    FrameType.STRIKE -> {
+                        val frameScore = if (index >= Frame.LAST_FRAME_INDEX) {
+                            tenthFrameStrikeScore(frame)
+                        } else {
+                            nextRolls(frames, index, 2)?.let { Roll.FRAME_PINS + it.sum() }
+                        }
+                        if (frameScore == null) {
+                            scoringStopped = true
+                            null
+                        } else {
+                            runningTotal += frameScore
+                            runningTotal
+                        }
+                    }
+                    FrameType.INCOMPLETE -> {
                         scoringStopped = true
                         null
                     }
@@ -84,6 +111,52 @@ object BowlingScoreCalculator {
         val second = frame.secondRoll ?: return FrameType.INCOMPLETE
         if (first == Roll.MAX_PINS) return FrameType.STRIKE
         return if (first + second == Roll.FRAME_PINS) FrameType.SPARE else FrameType.OPEN
+    }
+
+    private fun nextRolls(frames: List<Frame>, afterFrameIndex: Int, count: Int): List<Int>? {
+        val rolls = mutableListOf<Int>()
+        var frameIndex = afterFrameIndex + 1
+
+        while (rolls.size < count && frameIndex < frames.size) {
+            val frame = frames[frameIndex]
+            val isTenthFrame = frameIndex == Frame.LAST_FRAME_INDEX
+
+            val first = frame.firstRoll ?: return null
+            rolls.add(first)
+            if (rolls.size >= count) return rolls
+
+            if (!isTenthFrame && first == Roll.MAX_PINS) {
+                frameIndex++
+                continue
+            }
+
+            val second = frame.secondRoll ?: return null
+            rolls.add(second)
+            if (rolls.size >= count) return rolls
+
+            if (isTenthFrame) {
+                frame.bonusRoll?.let { rolls.add(it) }
+            }
+            frameIndex++
+        }
+
+        return if (rolls.size >= count) rolls else null
+    }
+
+    private fun tenthFrameSpareBonusRoll(frame: Frame): Int? {
+        val first = frame.firstRoll ?: return null
+        val second = frame.secondRoll ?: return null
+        if (first + second != Roll.FRAME_PINS) return null
+        return frame.bonusRoll
+    }
+
+    private fun tenthFrameStrikeScore(frame: Frame): Int? {
+        val first = frame.firstRoll ?: return null
+        if (first != Roll.MAX_PINS) return null
+
+        val second = frame.secondRoll ?: return null
+        val bonus = frame.bonusRoll ?: return null
+        return Roll.FRAME_PINS + second + bonus
     }
 
     private fun resolveFramePins(frame: Frame, frameType: FrameType): Int? {
