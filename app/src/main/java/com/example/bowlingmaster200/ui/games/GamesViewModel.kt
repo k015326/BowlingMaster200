@@ -60,13 +60,7 @@ class GamesViewModel(
                     frames = domainFrames,
                 )
                 repository.saveGame(savedGame)
-                _uiState.update {
-                    it.copy(
-                        isSaving = false,
-                        saveMessage = "保存しました（Total: ${gameScore.totalScore}）",
-                        validationError = null,
-                    )
-                }
+                resetGame()
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
@@ -80,6 +74,10 @@ class GamesViewModel(
 
     fun clearSaveMessage() {
         _uiState.update { it.copy(saveMessage = null) }
+    }
+
+    fun resetGame() {
+        _uiState.value = GamesUiState.initial()
     }
 
     fun selectCell(frameIndex: Int, rollIndex: Int) {

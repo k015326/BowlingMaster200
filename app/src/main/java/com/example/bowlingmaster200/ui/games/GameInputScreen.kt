@@ -86,11 +86,21 @@ fun GameInputScreen(
         )
 
         Button(
-            onClick = { viewModel.saveGame() },
+            onClick = { viewModel.resetGame() },
             enabled = !uiState.isSaving,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 12.dp),
+        ) {
+            Text("NEW GAME")
+        }
+
+        Button(
+            onClick = { viewModel.saveGame() },
+            enabled = uiState.isComplete && !uiState.isSaving,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
         ) {
             Text(if (uiState.isSaving) "Saving..." else "SAVE")
         }
