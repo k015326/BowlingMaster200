@@ -3,6 +3,7 @@ package com.example.bowlingmaster200.ocr.pipeline
 import com.example.bowlingmaster200.ocr.analyzer.BowlingScoreSheetAnalyzer
 import com.example.bowlingmaster200.ocr.analyzer.ScoreSheetAnalysisResult
 import com.example.bowlingmaster200.ocr.camera.CameraFrame
+import com.example.bowlingmaster200.ocr.mapper.OcrInputMapper
 import com.example.bowlingmaster200.ocr.service.OcrService
 
 /**
@@ -34,15 +35,7 @@ class OcrPipeline(
     }
 
     suspend fun executeFromCamera(frame: CameraFrame): OcrPipelineResult {
-        return execute(
-            OcrInput(
-                source = OcrImageSource.Camera(frame),
-                metadata = OcrInputMetadata(
-                    sourceLabel = "camera",
-                    rotationDegrees = frame.rotationDegrees,
-                ),
-            ),
-        )
+        return execute(OcrInputMapper.fromCameraFrame(frame))
     }
 
     companion object {
