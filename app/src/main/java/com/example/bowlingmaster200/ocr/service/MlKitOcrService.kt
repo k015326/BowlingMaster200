@@ -2,8 +2,8 @@ package com.example.bowlingmaster200.ocr.service
 
 import android.content.Context
 import com.example.bowlingmaster200.ocr.pipeline.OcrInput
-import com.example.bowlingmaster200.ocr.pipeline.OcrLine
 import com.example.bowlingmaster200.ocr.pipeline.OcrResult
+import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -26,9 +26,10 @@ class MlKitOcrService(
     }
 
     override suspend fun recognize(input: OcrInput): OcrResult {
+        OcrLogger.d("MlKitOcrService.recognize source=${input.metadata.sourceLabel}")
         val inputImage = OcrInputImageConverter.toInputImage(context, input)
         val visionText = recognizeText(inputImage)
-        return toOcrResult(input, visionText)
+        return toOcrResult(input, visionText).also { OcrLogger.logOcrResult(it) }
     }
 
     private suspend fun recognizeText(inputImage: InputImage): Text {
@@ -48,26 +49,28 @@ class MlKitOcrService(
     }
 
     private fun toOcrResult(input: OcrInput, visionText: Text): OcrResult {
-        val lines = visionText.textBlocks
-            .flatMap { block -> block.lines }
-            .mapIndexed { index, line ->
-                OcrLine(
-                    text = line.text,
-                    confidence = null,
-                    lineIndex = index,
-                )
-            }
+        val normalized = OcrTextNormalizer.fromMlKitText(visionText)
+        val rawText = normalized.rawText.ifBlank { "" }
 
         return OcrResult(
-            rawText = visionText.text,
-            lines = lines,
-            confidence = null,
+            rawText = rawText,
+            lines = normalized.lines,
+            confidence = estimateConfidence(normalized),
             engineId = engineId,
             debugInfo = mapOf(
                 "engine" to "mlkit",
                 "source" to input.metadata.sourceLabel.orEmpty(),
+                "blockCount" to normalized.blockCount.toString(),
+                "lineCount" to normalized.lines.size.toString(),
+                "droppedLines" to normalized.droppedLineCount.toString(),
+                "usable" to OcrTextNormalizer.isUsableForAnalyzer(rawText).toString(),
             ),
         )
+    }
+
+    private fun estimateConfidence(normalized: OcrTextNormalizer.NormalizedText): Float? {
+        if (normalized.lines.isEmpty()) return 0f
+        return if (OcrTextNormalizer.isUsableForAnalyzer(normalized.rawText)) 1f else 0.5f
     }
 
     companion object {

@@ -33,6 +33,8 @@ internal object OcrInputImageConverter {
     private fun fromBytes(bytes: ByteArray, rotationDegrees: Int): InputImage {
         val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
             ?: error("Failed to decode image bytes for ML Kit OCR")
-        return InputImage.fromBitmap(bitmap, rotationDegrees)
+        val inputImage = InputImage.fromBitmap(bitmap, rotationDegrees)
+        bitmap.recycle()
+        return inputImage
     }
 }

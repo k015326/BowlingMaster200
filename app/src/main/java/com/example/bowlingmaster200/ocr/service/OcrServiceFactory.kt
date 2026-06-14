@@ -31,6 +31,9 @@ object OcrServiceFactory {
         val context = checkNotNull(appContext) {
             "Call OcrServiceFactory.init(context) before using EngineMode.REAL"
         }
-        return MlKitOcrService(context)
+        return FallbackOcrService(
+            primary = MlKitOcrService(context),
+            fallback = FakeOcrService(),
+        )
     }
 }

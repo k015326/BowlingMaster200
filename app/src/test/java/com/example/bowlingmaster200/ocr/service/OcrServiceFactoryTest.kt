@@ -23,7 +23,7 @@ class OcrServiceFactoryTest {
     }
 
     @Test
-    fun create_realMode_returnsMlKitOcrService() {
+    fun create_realMode_returnsFallbackOcrServiceWithMlKitPrimary() {
         val context = mockk<Context>()
         every { context.applicationContext } returns context
         OcrServiceFactory.init(context)
@@ -31,6 +31,6 @@ class OcrServiceFactoryTest {
         val engine = OcrServiceFactory.create(OcrServiceFactory.EngineMode.REAL)
 
         assertEquals(MlKitOcrService.ENGINE_ID, engine.engineId)
-        assertTrue(engine is MlKitOcrService)
+        assertTrue(engine is FallbackOcrService)
     }
 }
