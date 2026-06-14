@@ -26,10 +26,18 @@ class MlKitOcrService(
     }
 
     override suspend fun recognize(input: OcrInput): OcrResult {
-        OcrLogger.d("MlKitOcrService.recognize source=${input.metadata.sourceLabel}")
-        val inputImage = OcrInputImageConverter.toInputImage(context, input)
-        val visionText = recognizeText(inputImage)
-        return toOcrResult(input, visionText).also { OcrLogger.logOcrResult(it) }
+        return try {
+            OcrLogger.d("MlKitOcrService.recognize source=${input.metadata.sourceLabel}")
+            val inputImage = OcrInputImageConverter.toInputImage(context, input)
+            val visionText = recognizeText(inputImage)
+            toOcrResult(input, visionText).also { OcrLogger.logOcrResult(it) }
+        } catch (error: Exception) {
+            OcrLogger.e("MlKitOcrService.recognize failed", error)
+            OcrSafeResults.emptyOcrResult(
+                engineId = engineId,
+                reason = error.message ?: "mlkit_error",
+            )
+        }
     }
 
     private suspend fun recognizeText(inputImage: InputImage): Text {
@@ -49,7 +57,15 @@ class MlKitOcrService(
     }
 
     private fun toOcrResult(input: OcrInput, visionText: Text): OcrResult {
-        val normalized = OcrTextNormalizer.fromMlKitText(visionText)
+        val normalized = try {
+            OcrTextNormalizer.fromMlKitText(visionText)
+        } catch (error: Exception) {
+            OcrLogger.e("ML Kit text normalization failed", error)
+            return OcrSafeResults.emptyOcrResult(
+                engineId = engineId,
+                reason = error.message ?: "normalize_error",
+            )
+        }
         val rawText = normalized.rawText.ifBlank { "" }
 
         return OcrResult(

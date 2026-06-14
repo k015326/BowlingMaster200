@@ -33,19 +33,34 @@ class FallbackOcrService(
         primaryResult: OcrResult? = null,
     ): OcrResult {
         OcrLogger.d("Fallback to FakeOcrService: reason=$reason")
-        val fallbackResult = fallback.recognize(input)
-        val mergedDebug = buildMap {
-            put("fallback", "true")
-            put("fallbackReason", reason)
-            put("primaryEngine", primary.engineId)
-            primaryResult?.debugInfo?.forEach { (key, value) ->
-                put("primary_$key", value)
+        return try {
+            val fallbackResult = fallback.recognize(input)
+            val mergedDebug = buildMap {
+                put("fallback", "true")
+                put("fallbackReason", reason)
+                put("primaryEngine", primary.engineId)
+                primaryResult?.debugInfo?.forEach { (key, value) ->
+                    put("primary_$key", value)
+                }
+                putAll(fallbackResult.debugInfo)
             }
-            putAll(fallbackResult.debugInfo)
+            fallbackResult.copy(
+                debugInfo = mergedDebug,
+            ).also { OcrLogger.logOcrResult(it) }
+        } catch (error: Exception) {
+            OcrLogger.e("Fallback OCR also failed", error)
+            OcrSafeResults.emptyOcrResult(
+                engineId = fallback.engineId,
+                reason = "fallback_failed:${error.message}",
+            ).copy(
+                debugInfo = mapOf(
+                    "fallback" to "true",
+                    "fallbackReason" to reason,
+                    "primaryEngine" to primary.engineId,
+                    "fallbackError" to (error.message ?: "unknown"),
+                ),
+            )
         }
-        return fallbackResult.copy(
-            debugInfo = mergedDebug,
-        ).also { OcrLogger.logOcrResult(it) }
     }
 
     private fun shouldFallback(result: OcrResult): Boolean {
