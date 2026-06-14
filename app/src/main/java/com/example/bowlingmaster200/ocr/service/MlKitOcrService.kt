@@ -63,6 +63,8 @@ class MlKitOcrService(
                 "blockCount" to normalized.blockCount.toString(),
                 "lineCount" to normalized.lines.size.toString(),
                 "droppedLines" to normalized.droppedLineCount.toString(),
+                "acceptedFrames" to normalized.filteredLineCount.toString(),
+                "rejectedLines" to normalized.rejectedLineCount.toString(),
                 "usable" to OcrTextNormalizer.isUsableForAnalyzer(rawText).toString(),
             ),
         )

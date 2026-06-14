@@ -1,10 +1,5 @@
 package com.example.bowlingmaster200.ocr.service
 
-import com.example.bowlingmaster200.ocr.pipeline.OcrImageSource
-import com.example.bowlingmaster200.ocr.pipeline.OcrInput
-import com.example.bowlingmaster200.ocr.pipeline.OcrInputMetadata
-import com.example.bowlingmaster200.ocr.pipeline.OcrResult
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -21,6 +16,20 @@ class OcrTextNormalizerTest {
     @Test
     fun normalizeLine_fixesCommonMisreadsInRolls() {
         assertEquals("F3:8,0", OcrTextNormalizer.normalizeLine("F3:8,O"))
+        assertEquals("F4:10", OcrTextNormalizer.normalizeLine("F4:X"))
+        assertEquals("F5:0,1", OcrTextNormalizer.normalizeLine("F5:-,l"))
+    }
+
+    @Test
+    fun normalizeLine_fixesFrameNumberMisreads() {
+        assertEquals("F1:10", OcrTextNormalizer.normalizeLine("Fl:10"))
+        assertEquals("F10:10,10,10", OcrTextNormalizer.normalizeLine("F1O:10,10,10"))
+    }
+
+    @Test
+    fun splitIntoFrameLines_splitsMergedRow() {
+        val split = OcrTextNormalizer.splitIntoFrameLines("F1:10 F2:7,3 F3:8,0")
+        assertEquals(listOf("F1:10", "F2:7,3", "F3:8,0"), split)
     }
 
     @Test
@@ -29,21 +38,72 @@ class OcrTextNormalizerTest {
     }
 
     @Test
-    fun isUsableForAnalyzer_requiresFrameLine() {
+    fun isUsableForAnalyzer_requiresValidFrameLine() {
         assertTrue(OcrTextNormalizer.isUsableForAnalyzer("Header\nF1:10\nF2:7,3"))
         assertFalse(OcrTextNormalizer.isUsableForAnalyzer("Bowling Score Sheet"))
         assertFalse(OcrTextNormalizer.isUsableForAnalyzer(""))
     }
 }
 
+class OcrAnalyzerInputFilterTest {
+
+    @Test
+    fun filterRawText_keepsValidFramesSorted() {
+        val result = OcrAnalyzerInputFilter.filterRawText(
+            """
+            Bowling Score
+            F3:8,0
+            F1:10
+            F2:7,3
+            """.trimIndent(),
+        )
+
+        assertEquals(
+            listOf("F1:10", "F2:7,3", "F3:8,0"),
+            result.acceptedLines,
+        )
+        assertEquals("F1:10\nF2:7,3\nF3:8,0", result.rawText)
+    }
+
+    @Test
+    fun filterRawText_rejectsInvalidRolls() {
+        val result = OcrAnalyzerInputFilter.filterRawText("F1:11\nF2:7,3")
+
+        assertEquals(listOf("F2:7,3"), result.acceptedLines)
+        assertTrue(result.rejectedLines.isNotEmpty())
+    }
+
+    @Test
+    fun filterRawText_rejectsStrikeWithSecondRollInRegularFrame() {
+        val result = OcrAnalyzerInputFilter.filterRawText("F1:10,5\nF2:8,0")
+
+        assertEquals(listOf("F2:8,0"), result.acceptedLines)
+    }
+
+    @Test
+    fun filterRawText_emptyInput_returnsEmpty() {
+        val result = OcrAnalyzerInputFilter.filterRawText("  \n  ")
+
+        assertEquals("", result.rawText)
+        assertTrue(result.acceptedLines.isEmpty())
+    }
+
+    @Test
+    fun filterRawText_deduplicatesByFrameKeepingLast() {
+        val result = OcrAnalyzerInputFilter.filterRawText("F1:9,0\nF1:10")
+
+        assertEquals(listOf("F1:10"), result.acceptedLines)
+    }
+}
+
 class FallbackOcrServiceTest {
 
     @Test
-    fun recognize_primaryFailure_fallsBackToFake() = runBlocking {
+    fun recognize_primaryFailure_fallsBackToFake() = kotlinx.coroutines.runBlocking {
         val failingPrimary = object : OcrEngine {
             override val engineId: String = "failing"
 
-            override suspend fun recognize(input: OcrInput): OcrResult {
+            override suspend fun recognize(input: com.example.bowlingmaster200.ocr.pipeline.OcrInput): OcrResult {
                 error("ML Kit unavailable")
             }
         }
@@ -57,11 +117,11 @@ class FallbackOcrServiceTest {
     }
 
     @Test
-    fun recognize_emptyPrimary_fallsBackToFake() = runBlocking {
+    fun recognize_emptyPrimary_fallsBackToFake() = kotlinx.coroutines.runBlocking {
         val emptyPrimary = object : OcrEngine {
             override val engineId: String = MlKitOcrService.ENGINE_ID
 
-            override suspend fun recognize(input: OcrInput): OcrResult {
+            override suspend fun recognize(input: com.example.bowlingmaster200.ocr.pipeline.OcrInput): OcrResult {
                 return OcrResult(
                     rawText = "",
                     lines = emptyList(),
@@ -78,7 +138,7 @@ class FallbackOcrServiceTest {
     }
 
     @Test
-    fun recognize_usablePrimary_keepsPrimaryResult() = runBlocking {
+    fun recognize_usablePrimary_keepsPrimaryResult() = kotlinx.coroutines.runBlocking {
         val primaryResult = OcrResult(
             rawText = "F1:10\nF2:7,3",
             engineId = MlKitOcrService.ENGINE_ID,
@@ -86,7 +146,8 @@ class FallbackOcrServiceTest {
         val primary = object : OcrEngine {
             override val engineId: String = MlKitOcrService.ENGINE_ID
 
-            override suspend fun recognize(input: OcrInput): OcrResult = primaryResult
+            override suspend fun recognize(input: com.example.bowlingmaster200.ocr.pipeline.OcrInput): OcrResult =
+                primaryResult
         }
         val service = FallbackOcrService(primary, FakeOcrService())
 
@@ -97,10 +158,13 @@ class FallbackOcrServiceTest {
         assertEquals(primaryResult.rawText, result.rawText)
     }
 
-    private fun testInput(): OcrInput {
-        return OcrInput(
-            source = OcrImageSource.Bytes(byteArrayOf(0), "image/jpeg"),
-            metadata = OcrInputMetadata(sourceLabel = "test"),
+    private fun testInput(): com.example.bowlingmaster200.ocr.pipeline.OcrInput {
+        return com.example.bowlingmaster200.ocr.pipeline.OcrInput(
+            source = com.example.bowlingmaster200.ocr.pipeline.OcrImageSource.Bytes(
+                byteArrayOf(0),
+                "image/jpeg",
+            ),
+            metadata = com.example.bowlingmaster200.ocr.pipeline.OcrInputMetadata(sourceLabel = "test"),
         )
     }
 }

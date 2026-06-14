@@ -4,17 +4,21 @@ import com.example.bowlingmaster200.ocr.pipeline.OcrLine
 import com.google.mlkit.vision.text.Text
 
 /**
- * ML Kit 出力の最小正規化（テキスト結合・空行除去・フレーム行の安全補正）。
+ * ML Kit 出力の正規化（行整形・数字誤認識補正・F1〜F10 フォーマット補正）。
  */
 internal object OcrTextNormalizer {
 
     private val FRAME_LINE_PATTERN = Regex("""^F(\d{1,2}):.+$""", RegexOption.IGNORE_CASE)
+    private val FRAME_SPLIT_PATTERN = Regex("""(?=F\s*\d)""", RegexOption.IGNORE_CASE)
+    private val FRAME_PREFIX_PATTERN = Regex("""^[Ff]\s*([ilILoO0|1-9]\d?)\s*[:;,]\s*(.*)$""")
 
     data class NormalizedText(
         val rawText: String,
         val lines: List<OcrLine>,
         val blockCount: Int,
         val droppedLineCount: Int,
+        val filteredLineCount: Int = 0,
+        val rejectedLineCount: Int = 0,
     )
 
     fun fromMlKitText(visionText: Text): NormalizedText {
@@ -28,8 +32,10 @@ internal object OcrTextNormalizer {
             )
 
         var dropped = 0
-        val normalizedLines = sortedLines.mapNotNull { line ->
-            val normalized = normalizeLine(line.text)
+        val candidateLines = sortedLines.flatMap { line ->
+            splitIntoFrameLines(line.text)
+        }.mapNotNull { candidate ->
+            val normalized = normalizeLine(candidate)
             if (normalized.isEmpty()) {
                 dropped++
                 null
@@ -38,45 +44,57 @@ internal object OcrTextNormalizer {
             }
         }
 
-        val ocrLines = normalizedLines.mapIndexed { index, text ->
+        val filtered = OcrAnalyzerInputFilter.filterLines(candidateLines)
+        val ocrLines = filtered.acceptedLines.mapIndexed { index, text ->
             OcrLine(text = text, confidence = null, lineIndex = index)
         }
 
         return NormalizedText(
-            rawText = normalizedLines.joinToString("\n"),
+            rawText = filtered.rawText,
             lines = ocrLines,
             blockCount = visionText.textBlocks.size,
             droppedLineCount = dropped,
+            filteredLineCount = filtered.acceptedLines.size,
+            rejectedLineCount = filtered.rejectedLines.size,
         )
+    }
+
+    fun splitIntoFrameLines(text: String): List<String> {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return emptyList()
+        val parts = FRAME_SPLIT_PATTERN.split(trimmed)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+        return if (parts.size <= 1) listOf(trimmed) else parts
     }
 
     fun normalizeLine(text: String): String {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return ""
 
-        val collapsed = trimmed.replace(Regex("\\s+"), " ")
+        val collapsed = trimmed
+            .replace(Regex("\\s+"), " ")
+            .replace('：', ':')
+            .replace('；', ';')
+
         return normalizeFrameLine(collapsed)
+    }
+
+    fun parseRollValue(segment: String): Int? {
+        val cleaned = normalizeRollSegment(segment)
+        if (cleaned.isEmpty()) return null
+        return cleaned.toIntOrNull()?.takeIf { it in 0..10 }
     }
 
     fun isUsableForAnalyzer(rawText: String): Boolean {
         if (rawText.isBlank()) return false
-        return rawText.lines().any { line ->
-            FRAME_LINE_PATTERN.matches(line.trim())
-        }
+        return OcrAnalyzerInputFilter.filterRawText(rawText).acceptedLines.isNotEmpty()
     }
 
     private fun normalizeFrameLine(line: String): String {
-        val frameMatch = Regex("""^[Ff]\s*([ilIL|1-9]\d?)\s*[:;,]\s*(.*)$""").find(line)
-            ?: return line
+        val frameMatch = FRAME_PREFIX_PATTERN.find(line) ?: return line
 
-        val frameNumber = frameMatch.groupValues[1]
-            .replace('l', '1')
-            .replace('I', '1')
-            .replace('i', '1')
-            .replace('|', '1')
-            .trim()
-
-        if (frameNumber.toIntOrNull() == null) return line
+        val frameNumber = normalizeFrameNumber(frameMatch.groupValues[1]) ?: return line
 
         val rollsPart = frameMatch.groupValues[2]
             .replace(';', ',')
@@ -85,20 +103,47 @@ internal object OcrTextNormalizer {
 
         val normalizedRolls = rollsPart.split(",")
             .filter { it.isNotEmpty() }
-            .joinToString(",") { segment -> normalizeRollSegment(segment) }
+            .mapNotNull { parseRollValue(it) }
 
-        return if (normalizedRolls.isEmpty()) {
-            "F$frameNumber:"
-        } else {
-            "F$frameNumber:$normalizedRolls"
+        if (normalizedRolls.isEmpty()) {
+            return "F$frameNumber:"
         }
+
+        return "F$frameNumber:${normalizedRolls.joinToString(",")}"
     }
 
-    private fun normalizeRollSegment(segment: String): String {
-        return segment
+    private fun normalizeFrameNumber(raw: String): String? {
+        val corrected = raw
+            .replace('l', '1')
+            .replace('I', '1')
+            .replace('i', '1')
+            .replace('|', '1')
+            .replace('O', '0')
+            .replace('o', '0')
+
+        val frameIndex = corrected.toIntOrNull() ?: return null
+        if (frameIndex !in 1..10) return null
+        return frameIndex.toString()
+    }
+
+    internal fun normalizeRollSegment(segment: String): String {
+        val trimmed = segment.trim()
+        if (trimmed.isEmpty()) return ""
+
+        when {
+            trimmed.equals("X", ignoreCase = true) -> return "10"
+            trimmed == "-" || trimmed == "G" || trimmed.equals("gutter", ignoreCase = true) -> return "0"
+        }
+
+        return trimmed
             .replace('O', '0')
             .replace('o', '0')
             .replace('l', '1')
+            .replace('I', '1')
+            .replace('S', '5')
+            .replace('s', '5')
+            .replace('B', '8')
+            .replace('b', '8')
             .filter { it.isDigit() }
     }
 }
