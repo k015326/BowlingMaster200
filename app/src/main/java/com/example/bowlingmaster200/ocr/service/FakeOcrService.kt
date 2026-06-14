@@ -41,14 +41,14 @@ class FakeOcrService : OcrService {
         val FAKE_SCORE_SHEET_TEXT: String = """
             Bowling Score Sheet
             F1:10
-            F2:7,3
-            F3:8,0
+            F2:10
+            F3:10
             F4:10
-            F5:9,0
+            F5:10
             F6:10
             F7:10
-            F8:7,3
-            F9:8,1
+            F8:10
+            F9:10
             F10:10,10,10
         """.trimIndent()
     }
