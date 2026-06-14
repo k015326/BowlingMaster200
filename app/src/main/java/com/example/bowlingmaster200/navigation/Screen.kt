@@ -18,6 +18,6 @@ sealed class Screen(
     data object Stats : Screen("stats", "Stats", Icons.Default.BarChart)
 
     companion object {
-        val bottomNavItems = listOf(Home, Games, Stats)
+        val bottomNavItems = listOf(Home, Games, Camera, Stats)
     }
 }

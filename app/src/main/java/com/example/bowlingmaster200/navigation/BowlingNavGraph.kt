@@ -35,7 +35,7 @@ fun BowlingNavGraph(
             }
             composable(Screen.Camera.route) {
                 val viewModel: CameraViewModel = viewModel()
-                CameraScreen(onFrameCaptured = viewModel::onFrameCaptured)
+                CameraScreen(viewModel = viewModel)
             }
             composable(Screen.Stats.route) {
                 StatsScreen()
