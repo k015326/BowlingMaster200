@@ -14,14 +14,17 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -89,7 +91,6 @@ fun CameraScreenContent(
     }
 
     val previewView = remember { PreviewView(context) }
-    var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var lastCapturedGeneration by remember { mutableIntStateOf(-1) }
 
     LaunchedEffect(hasCameraPermission, scanGeneration) {
@@ -106,7 +107,6 @@ fun CameraScreenContent(
                 val capture = ImageCapture.Builder()
                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                     .build()
-                imageCapture = capture
 
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(
@@ -138,14 +138,21 @@ fun CameraScreenContent(
                 factory = { previewView },
                 modifier = Modifier.fillMaxSize(),
             )
+        } else {
+            Text(
+                text = "Camera permission required",
+                modifier = Modifier.align(Alignment.Center),
+            )
         }
 
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
-                .padding(12.dp),
+                .heightIn(max = 360.dp)
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
             if (uiState.isProcessing) {
                 CircularProgressIndicator(
@@ -156,63 +163,42 @@ fun CameraScreenContent(
             }
 
             Text(
-                text = "OCR E2E (${uiState.engineId ?: "..."})",
-                style = MaterialTheme.typography.titleSmall,
+                text = "OCR Score Scan",
+                style = MaterialTheme.typography.titleMedium,
             )
 
-            uiState.totalScore?.let { total ->
+            Spacer(modifier = Modifier.height(8.dp))
+            OcrStatusBanner(uiState = uiState)
+
+            Spacer(modifier = Modifier.height(8.dp))
+            OcrScoreHeader(uiState = uiState)
+
+            if (uiState.isScoreComplete) {
                 Text(
-                    text = "Total: $total ${if (uiState.isScoreComplete) "✓" else ""}",
-                    style = MaterialTheme.typography.titleMedium,
+                    text = "Complete game",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
 
-            Text(
-                text = "Frames parsed: ${uiState.parsedFrameCount}/10",
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 2.dp),
-            )
+            Spacer(modifier = Modifier.height(12.dp))
+            OcrFrameScoreGrid(frames = uiState.frameDisplays)
 
-            uiState.errorMessage?.let { error ->
-                Text(
-                    text = "Error: $error",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(8.dp))
 
-            if (uiState.warnings.isNotEmpty()) {
-                Text(
-                    text = "Warnings: ${uiState.warnings.joinToString()}",
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
+            OcrRecognizedTextPanel(rawText = uiState.rawOcrText)
 
-            Text(
-                text = "Raw OCR:",
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-            Text(
-                text = uiState.rawOcrText ?: "(waiting for capture...)",
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 120.dp)
-                    .verticalScroll(rememberScrollState())
-                    .padding(top = 2.dp),
-            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OcrWarningsPanel(warnings = uiState.warnings)
 
+            Spacer(modifier = Modifier.height(12.dp))
             Button(
                 onClick = onRescanClick,
                 enabled = hasCameraPermission && !uiState.isProcessing,
-                modifier = Modifier
-                    .align(Alignment.End)
-                    .padding(top = 8.dp),
+                modifier = Modifier.align(Alignment.End),
             ) {
                 Text("Rescan")
             }

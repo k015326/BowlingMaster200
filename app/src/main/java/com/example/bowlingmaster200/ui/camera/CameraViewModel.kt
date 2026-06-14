@@ -51,6 +51,20 @@ class CameraViewModel : ViewModel() {
                     ?.count { it.firstRoll != null }
                     ?: 0
 
+                val frameDisplays = uiResult.gameScore?.frameScores?.map { score ->
+                    OcrFrameDisplay(
+                        frameIndex = score.frameIndex,
+                        roll1 = formatOcrRoll(score.firstRoll),
+                        roll2 = formatOcrRoll(
+                            value = score.secondRoll,
+                            isSecondRoll = true,
+                            firstRoll = score.firstRoll,
+                        ),
+                        roll3 = score.bonusRoll?.let { formatOcrRoll(it) },
+                        cumulative = score.cumulativeScore?.toString() ?: "—",
+                    )
+                } ?: emptyList()
+
                 _uiState.update {
                     CameraUiState(
                         isProcessing = false,
@@ -60,8 +74,11 @@ class CameraViewModel : ViewModel() {
                         totalScore = uiResult.gameScore?.totalScore,
                         isScoreComplete = uiResult.gameScore?.isComplete == true,
                         parsedFrameCount = parsedFrames,
+                        frameDisplays = frameDisplays,
                         warnings = uiResult.warnings,
                         errorMessage = uiResult.errorMessage,
+                        isFallbackActive = ocrResult.debugInfo["fallback"] == "true",
+                        fallbackReason = ocrResult.debugInfo["fallbackReason"],
                         debugInfo = ocrResult.debugInfo,
                     )
                 }
