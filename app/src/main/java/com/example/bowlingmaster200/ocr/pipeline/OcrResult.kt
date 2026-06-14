@@ -6,15 +6,8 @@ package com.example.bowlingmaster200.ocr.pipeline
  */
 data class OcrResult(
     val rawText: String,
-    val lines: List<OcrLine> = emptyList(),
-    val confidence: Float? = null,
+    val lines: List<String> = emptyList(),
+    val confidence: Float = 0f,
     val engineId: String,
-    val processedAtMillis: Long = System.currentTimeMillis(),
     val debugInfo: Map<String, String> = emptyMap(),
-)
-
-data class OcrLine(
-    val text: String,
-    val confidence: Float? = null,
-    val lineIndex: Int = 0,
 )

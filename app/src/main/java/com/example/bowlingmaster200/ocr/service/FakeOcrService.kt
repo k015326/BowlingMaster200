@@ -1,7 +1,6 @@
 package com.example.bowlingmaster200.ocr.service
 
 import com.example.bowlingmaster200.ocr.pipeline.OcrInput
-import com.example.bowlingmaster200.ocr.pipeline.OcrLine
 import com.example.bowlingmaster200.ocr.pipeline.OcrResult
 
 /**
@@ -14,9 +13,7 @@ class FakeOcrService : OcrEngine {
     override suspend fun recognize(input: OcrInput): OcrResult {
         val lines = FAKE_SCORE_SHEET_TEXT.lines()
             .filter { it.isNotBlank() }
-            .mapIndexed { index, line ->
-                OcrLine(text = line.trim(), confidence = 1.0f, lineIndex = index)
-            }
+            .map { it.trim() }
 
         return OcrResult(
             rawText = FAKE_SCORE_SHEET_TEXT,

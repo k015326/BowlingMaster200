@@ -1,6 +1,5 @@
 package com.example.bowlingmaster200.ocr.service
 
-import com.example.bowlingmaster200.ocr.pipeline.OcrLine
 import com.google.mlkit.vision.text.Text
 
 /**
@@ -14,7 +13,7 @@ internal object OcrTextNormalizer {
 
     data class NormalizedText(
         val rawText: String,
-        val lines: List<OcrLine>,
+        val lines: List<String>,
         val blockCount: Int,
         val droppedLineCount: Int,
         val filteredLineCount: Int = 0,
@@ -45,13 +44,10 @@ internal object OcrTextNormalizer {
         }
 
         val filtered = OcrAnalyzerInputFilter.filterLines(candidateLines)
-        val ocrLines = filtered.acceptedLines.mapIndexed { index, text ->
-            OcrLine(text = text, confidence = null, lineIndex = index)
-        }
 
         return NormalizedText(
             rawText = filtered.rawText,
-            lines = ocrLines,
+            lines = filtered.acceptedLines,
             blockCount = visionText.textBlocks.size,
             droppedLineCount = dropped,
             filteredLineCount = filtered.acceptedLines.size,

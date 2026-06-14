@@ -98,7 +98,7 @@ class MlKitOcrService(
         )
     }
 
-    private fun estimateConfidence(normalized: OcrTextNormalizer.NormalizedText): Float? {
+    private fun estimateConfidence(normalized: OcrTextNormalizer.NormalizedText): Float {
         if (normalized.lines.isEmpty()) return 0f
         return if (OcrTextNormalizer.isUsableForAnalyzer(normalized.rawText)) 1f else 0.5f
     }
