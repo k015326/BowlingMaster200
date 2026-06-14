@@ -3,6 +3,7 @@ package com.example.bowlingmaster200.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.SportsScore
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -13,6 +14,7 @@ sealed class Screen(
 ) {
     data object Home : Screen("home", "Home", Icons.Default.Home)
     data object Games : Screen("games", "Games", Icons.Default.SportsScore)
+    data object Camera : Screen("camera", "Camera", Icons.Default.CameraAlt)
     data object Stats : Screen("stats", "Stats", Icons.Default.BarChart)
 
     companion object {
