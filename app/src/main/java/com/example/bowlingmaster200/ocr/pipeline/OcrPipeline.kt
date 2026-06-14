@@ -4,22 +4,21 @@ import com.example.bowlingmaster200.ocr.analyzer.BowlingScoreSheetAnalyzer
 import com.example.bowlingmaster200.ocr.analyzer.ScoreSheetAnalysisResult
 import com.example.bowlingmaster200.ocr.camera.CameraFrame
 import com.example.bowlingmaster200.ocr.mapper.OcrInputMapper
-import com.example.bowlingmaster200.ocr.service.OcrService
+import com.example.bowlingmaster200.ocr.service.OcrEngine
+import com.example.bowlingmaster200.ocr.service.OcrServiceFactory
 
 /**
  * OCR 全体フローのオーケストレータ。
  *
  * ```
- * OcrInput → ImagePreprocessor → OcrService → BowlingScoreSheetAnalyzer → OcrPipelineResult
+ * OcrInput → ImagePreprocessor → OcrEngine → BowlingScoreSheetAnalyzer → OcrPipelineResult
  * ```
  *
- * SpareMaster 移植時:
- * - [ImagePreprocessor] に OcrInputBitmapPipeline 相当を注入
- * - [OcrService] に ML Kit / Gemini 実装を注入
+ * DI: [createDefault] は [OcrServiceFactory] 経由で [OcrEngine] を注入する。
  */
 class OcrPipeline(
     private val preprocessor: ImagePreprocessor = NoOpImagePreprocessor,
-    private val ocrService: OcrService,
+    private val ocrService: OcrEngine,
     private val analyzer: BowlingScoreSheetAnalyzer = BowlingScoreSheetAnalyzer(),
 ) {
 
@@ -39,7 +38,9 @@ class OcrPipeline(
     }
 
     companion object {
-        fun createDefault(ocrService: OcrService): OcrPipeline {
+        fun createDefault(
+            ocrService: OcrEngine = OcrServiceFactory.create(),
+        ): OcrPipeline {
             return OcrPipeline(
                 preprocessor = NoOpImagePreprocessor,
                 ocrService = ocrService,

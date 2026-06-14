@@ -4,8 +4,8 @@ import com.example.bowlingmaster200.ocr.pipeline.OcrInput
 import com.example.bowlingmaster200.ocr.pipeline.OcrResult
 
 /**
- * OCR エンジンの抽象。
- * ML Kit / Gemini Vision / その他を [engineId] で差し替え。
+ * OCR エンジンの抽象（[OcrEngine] の実体）。
+ * 差し替え実装は [engineId] と [recognize] のみ提供すればよい。
  */
 interface OcrService {
 
