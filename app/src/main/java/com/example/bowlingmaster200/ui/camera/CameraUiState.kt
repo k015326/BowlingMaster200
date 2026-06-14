@@ -13,5 +13,4 @@ data class CameraUiState(
     val errorMessage: String? = null,
     val isFallbackActive: Boolean = false,
     val fallbackReason: String? = null,
-    val debugInfo: Map<String, String> = emptyMap(),
 )

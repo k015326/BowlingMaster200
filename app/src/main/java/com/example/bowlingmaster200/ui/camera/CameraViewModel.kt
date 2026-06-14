@@ -1,6 +1,5 @@
 package com.example.bowlingmaster200.ui.camera
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.bowlingmaster200.camera.CapturedCameraFrame
@@ -36,16 +35,7 @@ class CameraViewModel : ViewModel() {
                     OcrInputMapper.fromCapturedFrame(frame, sourceLabel = "camera-live"),
                 )
                 val ocrResult = pipelineResult.ocrResult
-
-                Log.d(TAG, "OCR raw text <<<\n${ocrResult.rawText}\n>>>")
-                OcrLogger.logOcrResult(ocrResult)
-
                 val uiResult = processOcrResult.execute(pipelineResult)
-                Log.d(
-                    TAG,
-                    "Score result total=${uiResult.gameScore?.totalScore} " +
-                        "complete=${uiResult.gameScore?.isComplete} engine=${uiResult.engineId}",
-                )
 
                 val parsedFrames = pipelineResult.analysis.savedGame?.frames
                     ?.count { it.firstRoll != null }
@@ -79,11 +69,10 @@ class CameraViewModel : ViewModel() {
                         errorMessage = uiResult.errorMessage,
                         isFallbackActive = ocrResult.debugInfo["fallback"] == "true",
                         fallbackReason = ocrResult.debugInfo["fallbackReason"],
-                        debugInfo = ocrResult.debugInfo,
                     )
                 }
             } catch (error: Exception) {
-                Log.e(TAG, "Camera OCR pipeline failed", error)
+                OcrLogger.e("Camera OCR pipeline failed", error)
                 _uiState.update {
                     it.copy(
                         isProcessing = false,
@@ -97,9 +86,5 @@ class CameraViewModel : ViewModel() {
     fun requestRescan() {
         _scanGeneration.update { it + 1 }
         _uiState.update { CameraUiState(isProcessing = true) }
-    }
-
-    companion object {
-        private const val TAG = "CameraOCR"
     }
 }

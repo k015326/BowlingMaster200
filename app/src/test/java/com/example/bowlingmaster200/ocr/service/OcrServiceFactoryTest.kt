@@ -18,8 +18,15 @@ class OcrServiceFactoryTest {
     }
 
     @Test
-    fun create_default_isFakeMode() {
-        assertEquals(FakeOcrService.ENGINE_ID, OcrServiceFactory.create().engineId)
+    fun create_default_usesRealEngine() {
+        val context = mockk<Context>()
+        every { context.applicationContext } returns context
+        OcrServiceFactory.init(context)
+
+        val engine = OcrServiceFactory.create()
+
+        assertEquals(MlKitOcrService.ENGINE_ID, engine.engineId)
+        assertTrue(engine is FallbackOcrService)
     }
 
     @Test

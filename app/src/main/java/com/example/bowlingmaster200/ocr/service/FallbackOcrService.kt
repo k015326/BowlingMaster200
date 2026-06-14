@@ -4,11 +4,11 @@ import com.example.bowlingmaster200.ocr.pipeline.OcrInput
 import com.example.bowlingmaster200.ocr.pipeline.OcrResult
 
 /**
- * プライマリ OCR 失敗時に [FakeOcrService] へフォールバックする [OcrEngine]。
+ * プライマリ OCR 失敗時にフォールバック OCR へ切り替える [OcrEngine]。
  */
 class FallbackOcrService(
     private val primary: OcrEngine,
-    private val fallback: OcrEngine = FakeOcrService(),
+    private val fallback: OcrEngine,
 ) : OcrEngine {
 
     override val engineId: String = primary.engineId
@@ -32,7 +32,7 @@ class FallbackOcrService(
         reason: String,
         primaryResult: OcrResult? = null,
     ): OcrResult {
-        OcrLogger.d("Fallback to FakeOcrService: reason=$reason")
+        OcrLogger.d("Fallback OCR engaged: reason=$reason")
         return try {
             val fallbackResult = fallback.recognize(input)
             val mergedDebug = buildMap {

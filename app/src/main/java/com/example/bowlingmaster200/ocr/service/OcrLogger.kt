@@ -1,6 +1,7 @@
 package com.example.bowlingmaster200.ocr.service
 
 import android.util.Log
+import com.example.bowlingmaster200.BuildConfig
 import com.example.bowlingmaster200.ocr.pipeline.OcrResult
 
 internal object OcrLogger {
@@ -8,18 +9,21 @@ internal object OcrLogger {
     private const val TAG = "BowlingOCR"
 
     fun d(message: String) {
-        Log.d(TAG, message)
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, message)
+        }
     }
 
     fun e(message: String, throwable: Throwable? = null) {
-        if (throwable != null) {
+        if (BuildConfig.DEBUG && throwable != null) {
             Log.e(TAG, message, throwable)
         } else {
-            Log.e(TAG, message)
+            Log.w(TAG, message)
         }
     }
 
     fun logOcrResult(result: OcrResult) {
+        if (!BuildConfig.DEBUG) return
         Log.d(
             TAG,
             buildString {

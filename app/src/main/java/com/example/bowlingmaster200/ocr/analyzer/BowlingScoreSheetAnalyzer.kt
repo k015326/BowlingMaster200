@@ -5,7 +5,6 @@ import com.example.bowlingmaster200.domain.model.GameMetadata
 import com.example.bowlingmaster200.domain.model.Roll
 import com.example.bowlingmaster200.domain.model.SavedGame
 import com.example.bowlingmaster200.ocr.pipeline.OcrResult
-import com.example.bowlingmaster200.ocr.service.FakeOcrService
 import com.example.bowlingmaster200.ocr.service.OcrLogger
 import com.example.bowlingmaster200.ocr.service.OcrSafeResults
 
@@ -156,19 +155,6 @@ class BowlingScoreSheetAnalyzer {
     private fun normalizeFrames(frameMap: Map<Int, Frame>): List<Frame> {
         return (1..Frame.FRAME_COUNT).map { index ->
             frameMap[index] ?: Frame()
-        }
-    }
-
-    companion object {
-        /** FakeOcrService 用の即席解析。 */
-        fun analyzeFake(): ScoreSheetAnalysisResult {
-            val analyzer = BowlingScoreSheetAnalyzer()
-            val fakeResult = OcrResult(
-                rawText = FakeOcrService.FAKE_SCORE_SHEET_TEXT,
-                engineId = FakeOcrService.ENGINE_ID,
-                confidence = 1.0f,
-            )
-            return analyzer.analyze(fakeResult)
         }
     }
 }

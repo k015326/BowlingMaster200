@@ -1,6 +1,7 @@
 package com.example.bowlingmaster200.ocr.service
 
 import android.content.Context
+import com.example.bowlingmaster200.BuildConfig
 import com.example.bowlingmaster200.ocr.pipeline.OcrInput
 import com.example.bowlingmaster200.ocr.pipeline.OcrResult
 import com.google.mlkit.vision.common.InputImage
@@ -73,16 +74,27 @@ class MlKitOcrService(
             lines = normalized.lines,
             confidence = estimateConfidence(normalized),
             engineId = engineId,
-            debugInfo = mapOf(
-                "engine" to "mlkit",
-                "source" to input.metadata.sourceLabel.orEmpty(),
-                "blockCount" to normalized.blockCount.toString(),
-                "lineCount" to normalized.lines.size.toString(),
-                "droppedLines" to normalized.droppedLineCount.toString(),
-                "acceptedFrames" to normalized.filteredLineCount.toString(),
-                "rejectedLines" to normalized.rejectedLineCount.toString(),
-                "usable" to OcrTextNormalizer.isUsableForAnalyzer(rawText).toString(),
-            ),
+            debugInfo = buildMlKitDebugInfo(input, normalized, rawText),
+        )
+    }
+
+    private fun buildMlKitDebugInfo(
+        input: OcrInput,
+        normalized: OcrTextNormalizer.NormalizedText,
+        rawText: String,
+    ): Map<String, String> {
+        if (!BuildConfig.DEBUG) {
+            return mapOf("engine" to "mlkit")
+        }
+        return mapOf(
+            "engine" to "mlkit",
+            "source" to input.metadata.sourceLabel.orEmpty(),
+            "blockCount" to normalized.blockCount.toString(),
+            "lineCount" to normalized.lines.size.toString(),
+            "droppedLines" to normalized.droppedLineCount.toString(),
+            "acceptedFrames" to normalized.filteredLineCount.toString(),
+            "rejectedLines" to normalized.rejectedLineCount.toString(),
+            "usable" to OcrTextNormalizer.isUsableForAnalyzer(rawText).toString(),
         )
     }
 

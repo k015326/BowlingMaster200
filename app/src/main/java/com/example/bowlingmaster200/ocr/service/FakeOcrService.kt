@@ -5,8 +5,7 @@ import com.example.bowlingmaster200.ocr.pipeline.OcrLine
 import com.example.bowlingmaster200.ocr.pipeline.OcrResult
 
 /**
- * UI 接続テスト用の固定ダミー OCR（[OcrEngine] 実装）。
- * [FakeOcrService.FAKE_SCORE_SHEET_TEXT] を返す。
+ * デバッグ / テスト専用の固定ダミー OCR（[OcrEngine] 実装）。
  */
 class FakeOcrService : OcrEngine {
 

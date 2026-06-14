@@ -1,11 +1,10 @@
 package com.example.bowlingmaster200.ocr.service
 
 import android.content.Context
+import com.example.bowlingmaster200.BuildConfig
 
 /**
  * [OcrEngine] の生成。Fake / Real の切り替えはここだけ。
- *
- * 本番 OCR へ切り替え: [create] の `mode` を [EngineMode.REAL] に変更する。
  */
 object OcrServiceFactory {
 
@@ -20,11 +19,16 @@ object OcrServiceFactory {
         appContext = context.applicationContext
     }
 
-    fun create(mode: EngineMode = EngineMode.FAKE): OcrEngine {
+    fun create(mode: EngineMode = EngineMode.REAL): OcrEngine {
         return when (mode) {
-            EngineMode.FAKE -> FakeOcrService()
+            EngineMode.FAKE -> createFakeEngine()
             EngineMode.REAL -> createRealEngine()
         }
+    }
+
+    private fun createFakeEngine(): OcrEngine {
+        check(BuildConfig.DEBUG) { "Fake OCR is available in debug builds only" }
+        return FakeOcrService()
     }
 
     private fun createRealEngine(): OcrEngine {
@@ -33,7 +37,15 @@ object OcrServiceFactory {
         }
         return FallbackOcrService(
             primary = MlKitOcrService(context),
-            fallback = FakeOcrService(),
+            fallback = createFallbackEngine(),
         )
+    }
+
+    private fun createFallbackEngine(): OcrEngine {
+        return if (BuildConfig.DEBUG) {
+            FakeOcrService()
+        } else {
+            EmptyOcrEngine()
+        }
     }
 }

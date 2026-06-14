@@ -2,6 +2,7 @@ package com.example.bowlingmaster200.ocr.usecase
 
 import com.example.bowlingmaster200.ocr.camera.CameraFrame
 import com.example.bowlingmaster200.ocr.camera.ImageFormat
+import com.example.bowlingmaster200.ocr.pipeline.OcrPipeline
 import com.example.bowlingmaster200.ocr.service.FakeOcrService
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -13,7 +14,9 @@ class ProcessCameraFrameUseCaseTest {
 
     @Test
     fun cameraFrame_fullPath_reachesCalculatorWith300() = runBlocking {
-        val uiResult = ProcessCameraFrameUseCase().execute(sampleCameraFrame())
+        val uiResult = ProcessCameraFrameUseCase(
+            pipeline = OcrPipeline.createDefault(FakeOcrService()),
+        ).execute(sampleCameraFrame())
 
         assertTrue(uiResult.isSuccess)
         assertNull(uiResult.errorMessage)
