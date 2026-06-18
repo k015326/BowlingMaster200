@@ -26,9 +26,25 @@ class OcrPipeline(
 
     suspend fun execute(input: OcrInput): OcrPipelineResult {
         return try {
+            val (width, height) = inputImageSize(input)
+            OcrLogger.logOcrStart(
+                source = input.metadata.sourceLabel,
+                bitmapWidth = width,
+                bitmapHeight = height,
+            )
+
             val preprocessed = safePreprocess(input)
             val ocrResult = safeRecognize(preprocessed)
+            OcrLogger.logOcrRawText(ocrResult)
+
+            OcrLogger.logParseStart(
+                engineId = ocrResult.engineId,
+                rawTextLength = ocrResult.rawText.length,
+                lineCount = ocrResult.lines.size,
+            )
             val analysis = safeAnalyze(ocrResult)
+            OcrLogger.logParseResult(analysis)
+
             OcrPipelineResult(
                 input = preprocessed,
                 ocrResult = ocrResult,
@@ -59,6 +75,13 @@ class OcrPipeline(
                 input = OcrInput(source = OcrImageSource.Camera(frame)),
                 reason = error.message ?: "camera_pipeline_error",
             )
+        }
+    }
+
+    private fun inputImageSize(input: OcrInput): Pair<Int?, Int?> {
+        return when (val source = input.source) {
+            is OcrImageSource.Camera -> source.frame.width to source.frame.height
+            else -> null to null
         }
     }
 

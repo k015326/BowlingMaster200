@@ -41,6 +41,9 @@ class CameraViewModel : ViewModel() {
                     ?.count { it.firstRoll != null }
                     ?: 0
 
+                val isFallbackActive = ocrResult.debugInfo["fallback"] == "true"
+                val fallbackReason = ocrResult.debugInfo["fallbackReason"]
+
                 val frameDisplays = uiResult.gameScore?.frameScores?.map { score ->
                     OcrFrameDisplay(
                         frameIndex = score.frameIndex,
@@ -67,8 +70,8 @@ class CameraViewModel : ViewModel() {
                         frameDisplays = frameDisplays,
                         warnings = uiResult.warnings,
                         errorMessage = uiResult.errorMessage,
-                        isFallbackActive = ocrResult.debugInfo["fallback"] == "true",
-                        fallbackReason = ocrResult.debugInfo["fallbackReason"],
+                        isFallbackActive = isFallbackActive,
+                        fallbackReason = fallbackReason,
                     )
                 }
             } catch (error: Exception) {

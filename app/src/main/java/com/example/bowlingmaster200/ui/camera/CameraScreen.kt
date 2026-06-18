@@ -2,7 +2,19 @@ package com.example.bowlingmaster200.ui.camera
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import com.example.bowlingmaster200.BuildConfig
+import com.example.bowlingmaster200.ocr.service.OcrMlKitInputDebugSnapshot
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
@@ -12,6 +24,7 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -92,6 +105,24 @@ fun CameraScreenContent(
 
     val previewView = remember { PreviewView(context) }
     var lastCapturedGeneration by remember { mutableIntStateOf(-1) }
+    var showDebugSnapshot by remember { mutableStateOf(false) }
+    var debugSnapshotBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    val hasDebugSnapshot = !uiState.isProcessing && OcrMlKitInputDebugSnapshot.exists(context)
+
+    DisposableEffect(showDebugSnapshot) {
+        if (showDebugSnapshot && BuildConfig.DEBUG) {
+            val file = OcrMlKitInputDebugSnapshot.snapshotFile(context)
+            debugSnapshotBitmap = if (file.exists()) {
+                BitmapFactory.decodeFile(file.absolutePath)
+            } else {
+                null
+            }
+        }
+        onDispose {
+            debugSnapshotBitmap?.recycle()
+            debugSnapshotBitmap = null
+        }
+    }
 
     LaunchedEffect(hasCameraPermission, scanGeneration) {
         if (!hasCameraPermission) return@LaunchedEffect
@@ -195,13 +226,53 @@ fun CameraScreenContent(
             OcrWarningsPanel(warnings = uiState.warnings)
 
             Spacer(modifier = Modifier.height(12.dp))
-            Button(
-                onClick = onRescanClick,
-                enabled = hasCameraPermission && !uiState.isProcessing,
-                modifier = Modifier.align(Alignment.End),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
             ) {
-                Text("Rescan")
+                if (BuildConfig.DEBUG) {
+                    OutlinedButton(
+                        onClick = { showDebugSnapshot = true },
+                        enabled = hasDebugSnapshot,
+                        modifier = Modifier.padding(end = 8.dp),
+                    ) {
+                        Text("Open Debug Snapshot")
+                    }
+                }
+                Button(
+                    onClick = onRescanClick,
+                    enabled = hasCameraPermission && !uiState.isProcessing,
+                ) {
+                    Text("Rescan")
+                }
             }
+        }
+
+        if (showDebugSnapshot && BuildConfig.DEBUG) {
+            AlertDialog(
+                onDismissRequest = { showDebugSnapshot = false },
+                title = { Text("ML Kit Input Snapshot") },
+                text = {
+                    val bitmap = debugSnapshotBitmap
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = "ML Kit debug snapshot",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 480.dp),
+                            contentScale = ContentScale.FillWidth,
+                        )
+                    } else {
+                        Text("No snapshot yet. Run OCR first.")
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showDebugSnapshot = false }) {
+                        Text("Close")
+                    }
+                },
+            )
         }
     }
 }

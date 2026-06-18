@@ -17,13 +17,27 @@ class FallbackOcrService(
         return try {
             val result = primary.recognize(input)
             if (shouldFallback(result)) {
-                recognizeWithFallback(input, reason = "empty_or_unparseable", primaryResult = result)
+                val reason = resolveFallbackReason(result)
+                OcrLogger.logFallbackReason(
+                    reason = reason,
+                    primaryEngine = result.engineId,
+                    primaryLineCount = result.lines.size,
+                    primaryRawText = result.rawText,
+                )
+                recognizeWithFallback(input, reason = reason, primaryResult = result)
             } else {
                 result
             }
         } catch (error: Exception) {
             OcrLogger.e("Primary OCR failed, switching to fallback", error)
-            recognizeWithFallback(input, reason = error.message ?: "error")
+            OcrLogger.logFallbackReason(
+                reason = REASON_OCR_EXCEPTION,
+                primaryEngine = primary.engineId,
+                primaryLineCount = null,
+                primaryRawText = null,
+                exception = error,
+            )
+            recognizeWithFallback(input, reason = REASON_OCR_EXCEPTION)
         }
     }
 
@@ -39,8 +53,16 @@ class FallbackOcrService(
                 put("fallback", "true")
                 put("fallbackReason", reason)
                 put("primaryEngine", primary.engineId)
-                primaryResult?.debugInfo?.forEach { (key, value) ->
-                    put("primary_$key", value)
+                primaryResult?.let { primary ->
+                    put("primaryRawText", truncateForDebug(primary.rawText))
+                    put("primaryLineCount", primary.lines.size.toString())
+                    put(
+                        "primary_usable",
+                        OcrTextNormalizer.isUsableForAnalyzer(primary.rawText).toString(),
+                    )
+                    primary.debugInfo.forEach { (key, value) ->
+                        put("primary_$key", value)
+                    }
                 }
                 putAll(fallbackResult.debugInfo)
             }
@@ -67,5 +89,27 @@ class FallbackOcrService(
         if (result.rawText.isBlank()) return true
         if (result.lines.isEmpty()) return true
         return !OcrTextNormalizer.isUsableForAnalyzer(result.rawText)
+    }
+
+    internal fun resolveFallbackReason(result: OcrResult): String {
+        if (result.rawText.isBlank()) return REASON_EMPTY_TEXT
+        if (result.lines.isEmpty()) return REASON_NO_LINES_DETECTED
+        if (!OcrTextNormalizer.isUsableForAnalyzer(result.rawText)) return REASON_PARSE_FAILED
+        return REASON_UNKNOWN
+    }
+
+    private fun truncateForDebug(text: String, maxLength: Int = MAX_DEBUG_TEXT_LENGTH): String {
+        if (text.length <= maxLength) return text
+        return text.take(maxLength) + "…(${text.length} chars total)"
+    }
+
+    companion object {
+        const val REASON_EMPTY_TEXT = "empty_text"
+        const val REASON_NO_LINES_DETECTED = "no_lines_detected"
+        const val REASON_PARSE_FAILED = "parse_failed"
+        const val REASON_OCR_EXCEPTION = "ocr_exception"
+        const val REASON_UNKNOWN = "unknown"
+
+        private const val MAX_DEBUG_TEXT_LENGTH = 4000
     }
 }
