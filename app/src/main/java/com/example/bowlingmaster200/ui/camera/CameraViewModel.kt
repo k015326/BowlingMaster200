@@ -88,6 +88,6 @@ class CameraViewModel : ViewModel() {
 
     fun requestRescan() {
         _scanGeneration.update { it + 1 }
-        _uiState.update { CameraUiState(isProcessing = true) }
+        _uiState.update { CameraUiState() }
     }
 }

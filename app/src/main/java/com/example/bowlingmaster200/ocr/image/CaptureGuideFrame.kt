@@ -1,6 +1,7 @@
 package com.example.bowlingmaster200.ocr.image
 
 import android.graphics.Rect
+import androidx.compose.ui.geometry.Rect as ComposeRect
 
 /**
  * 1ゲーム単位撮影ガイド枠（正規化座標 0.0〜1.0）。
@@ -20,4 +21,12 @@ object CaptureGuideFrame {
         val bottom = (height * GUIDE_BOTTOM).toInt().coerceIn(top + 1, height)
         return Rect(left, top, right, bottom)
     }
+
+    fun toComposeRect(width: Float, height: Float): ComposeRect =
+        ComposeRect(
+            left = width * GUIDE_LEFT,
+            top = height * GUIDE_TOP,
+            right = width * GUIDE_RIGHT,
+            bottom = height * GUIDE_BOTTOM,
+        )
 }

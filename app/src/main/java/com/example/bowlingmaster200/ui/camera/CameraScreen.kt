@@ -3,6 +3,9 @@ package com.example.bowlingmaster200.ui.camera
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Row
@@ -17,6 +20,7 @@ import com.example.bowlingmaster200.BuildConfig
 import com.example.bowlingmaster200.ocr.service.OcrMlKitInputDebugSnapshot
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
@@ -31,7 +35,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -43,7 +46,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -57,6 +59,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.bowlingmaster200.camera.CameraFrameCapture
 import com.example.bowlingmaster200.camera.CapturedCameraFrame
+import java.util.concurrent.Executors
+
+private const val CAPTURE_AUTO_SHUTTER_DEBUG_TAG = "CaptureAutoShutterDebug"
 
 @Composable
 fun CameraScreen(
@@ -103,8 +108,21 @@ fun CameraScreenContent(
         }
     }
 
-    val previewView = remember { PreviewView(context) }
-    var lastCapturedGeneration by remember { mutableIntStateOf(-1) }
+    val previewView = remember {
+        PreviewView(context).apply {
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+        }
+    }
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
+    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
+    var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
+    var autoShutterState by remember { mutableStateOf(CaptureAutoShutterState()) }
+    val autoShutterAnalyzer = remember {
+        CaptureAutoShutterAnalyzer { state ->
+            mainHandler.post { autoShutterState = state }
+        }
+    }
+    var autoShutterPaused by remember { mutableStateOf(false) }
     var showDebugSnapshot by remember { mutableStateOf(false) }
     var debugSnapshotBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     val hasDebugSnapshot = !uiState.isProcessing && OcrMlKitInputDebugSnapshot.exists(context)
@@ -124,13 +142,15 @@ fun CameraScreenContent(
         }
     }
 
-    LaunchedEffect(hasCameraPermission, scanGeneration) {
-        if (!hasCameraPermission) return@LaunchedEffect
-        if (lastCapturedGeneration == scanGeneration) return@LaunchedEffect
+    DisposableEffect(hasCameraPermission, lifecycleOwner) {
+        if (!hasCameraPermission) {
+            imageCapture = null
+            return@DisposableEffect onDispose { }
+        }
 
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-        cameraProviderFuture.addListener(
-            {
+        val listener = Runnable {
+            try {
                 val cameraProvider = cameraProviderFuture.get()
                 val preview = Preview.Builder().build().also {
                     it.surfaceProvider = previewView.surfaceProvider
@@ -138,53 +158,115 @@ fun CameraScreenContent(
                 val capture = ImageCapture.Builder()
                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                     .build()
-
+                val analysis = ImageAnalysis.Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
+                    .also { it.setAnalyzer(analysisExecutor, autoShutterAnalyzer) }
+                imageCapture = capture
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(
                     lifecycleOwner,
                     CameraSelector.DEFAULT_BACK_CAMERA,
                     preview,
                     capture,
+                    analysis,
                 )
+            } catch (_: Exception) {
+                imageCapture = null
+            }
+        }
+        cameraProviderFuture.addListener(listener, ContextCompat.getMainExecutor(context))
 
-                capture.takePicture(
-                    ContextCompat.getMainExecutor(context),
-                    object : ImageCapture.OnImageCapturedCallback() {
-                        override fun onCaptureSuccess(image: ImageProxy) {
-                            lastCapturedGeneration = scanGeneration
-                            onFrameCaptured(CameraFrameCapture.fromImageProxy(image))
-                        }
+        onDispose {
+            imageCapture = null
+            autoShutterAnalyzer.reset()
+            analysisExecutor.shutdown()
+            runCatching { cameraProviderFuture.get().unbindAll() }
+        }
+    }
 
-                        override fun onError(exception: ImageCaptureException) = Unit
-                    },
-                )
-            },
+    LaunchedEffect(scanGeneration) {
+        autoShutterPaused = false
+        autoShutterAnalyzer.reset()
+    }
+
+    LaunchedEffect(autoShutterState.ready, uiState.isProcessing, autoShutterPaused, imageCapture) {
+        if (autoShutterState.ready) {
+            Log.d(CAPTURE_AUTO_SHUTTER_DEBUG_TAG, "LaunchedEffect entered with ready=true")
+        }
+        Log.d(
+            CAPTURE_AUTO_SHUTTER_DEBUG_TAG,
+            "imageCapture is null=${imageCapture == null}",
+        )
+
+        val capture = imageCapture ?: return@LaunchedEffect
+        if (
+            !autoShutterState.ready ||
+            uiState.isProcessing ||
+            autoShutterPaused
+        ) {
+            return@LaunchedEffect
+        }
+
+        autoShutterPaused = true
+        Log.d(CAPTURE_AUTO_SHUTTER_DEBUG_TAG, "calling takePicture")
+        capture.takePicture(
             ContextCompat.getMainExecutor(context),
+            object : ImageCapture.OnImageCapturedCallback() {
+                override fun onCaptureSuccess(image: ImageProxy) {
+                    Log.d(CAPTURE_AUTO_SHUTTER_DEBUG_TAG, "onCaptureSuccess")
+                    onFrameCaptured(CameraFrameCapture.fromImageProxy(image))
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    Log.d(
+                        CAPTURE_AUTO_SHUTTER_DEBUG_TAG,
+                        "onError: ${exception.message}",
+                        exception,
+                    )
+                    autoShutterPaused = false
+                    autoShutterAnalyzer.reset()
+                }
+            },
         )
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        if (hasCameraPermission) {
-            AndroidView(
-                factory = { previewView },
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            Text(
-                text = "Camera permission required",
-                modifier = Modifier.align(Alignment.Center),
-            )
-        }
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (hasCameraPermission) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(360.dp),
+                ) {
+                    AndroidView(
+                        factory = { previewView },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    CaptureGuideOverlay(
+                        frameReady = autoShutterState.ready,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(360.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(text = "Camera permission required")
+                }
+            }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .heightIn(max = 360.dp)
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            ) {
             if (uiState.isProcessing) {
                 CircularProgressIndicator(
                     modifier = Modifier
@@ -245,6 +327,7 @@ fun CameraScreenContent(
                 ) {
                     Text("Rescan")
                 }
+            }
             }
         }
 
