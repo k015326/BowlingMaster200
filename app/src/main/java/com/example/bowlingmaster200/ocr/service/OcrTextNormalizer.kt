@@ -30,6 +30,15 @@ internal object OcrTextNormalizer {
                 ),
             )
 
+        OcrLogger.logMlKitSortedLines(sortedLines)
+        sortedLines.forEach { line ->
+            OcrLogger.logLineSplitDebug(
+                sourceText = line.text,
+                sourceBbox = line.boundingBox,
+                parts = splitIntoFrameLines(line.text),
+            )
+        }
+
         var dropped = 0
         val candidateLines = sortedLines.flatMap { line ->
             splitIntoFrameLines(line.text)
@@ -43,7 +52,20 @@ internal object OcrTextNormalizer {
             }
         }
 
+        OcrLogger.logNormalizationCandidates(candidateLines)
+        OcrLogger.logFilterLinesBoundary("before", candidateLines)
         val filtered = OcrAnalyzerInputFilter.filterLines(candidateLines)
+        OcrLogger.logFilterLinesAfter(filtered)
+        OcrLogger.logFilterPipelineSummary(
+            mlKitTextLength = visionText.text.length,
+            blockCount = visionText.textBlocks.size,
+            sortedLineCount = sortedLines.size,
+            droppedLineCount = dropped,
+            candidateLineCount = candidateLines.size,
+            acceptedLineCount = filtered.acceptedLines.size,
+            rejectedLineCount = filtered.rejectedLines.size,
+            filteredRawTextLength = filtered.rawText.length,
+        )
 
         return NormalizedText(
             rawText = filtered.rawText,

@@ -24,6 +24,20 @@ class FallbackOcrService(
                     primaryLineCount = result.lines.size,
                     primaryRawText = result.rawText,
                 )
+                if (reason == REASON_EMPTY_TEXT) {
+                    OcrLogger.logEmptyTextPrimarySnapshot(
+                        primaryRawText = result.rawText,
+                        primaryLineCount = result.lines.size,
+                        acceptedLineCount = result.debugInfo["acceptedFrames"]?.toIntOrNull()
+                            ?: result.lines.size,
+                        rejectedLineCount = result.debugInfo["rejectedLines"]?.toIntOrNull() ?: 0,
+                    )
+                    OcrLogger.d(
+                        "[Fallback empty_text note] primaryRawText is post-filter output; " +
+                            "see [ML Kit text structure] and [OcrAnalyzerInputFilter] logs " +
+                            "for raw ML Kit text and lineVerdicts",
+                    )
+                }
                 recognizeWithFallback(input, reason = reason, primaryResult = result)
             } else {
                 result

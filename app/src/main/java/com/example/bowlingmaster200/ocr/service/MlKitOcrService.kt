@@ -31,7 +31,7 @@ class MlKitOcrService(
             OcrLogger.d("MlKitOcrService.recognize source=${input.metadata.sourceLabel}")
             val inputImage = OcrInputImageConverter.toInputImage(context, input)
             val visionText = recognizeText(inputImage)
-            toOcrResult(input, visionText).also { OcrLogger.logOcrResult(it) }
+            toOcrResult(input, visionText, inputImage).also { OcrLogger.logOcrResult(it) }
         } catch (error: Exception) {
             OcrLogger.e("MlKitOcrService.recognize failed", error)
             OcrSafeResults.emptyOcrResult(
@@ -57,7 +57,14 @@ class MlKitOcrService(
         }
     }
 
-    private fun toOcrResult(input: OcrInput, visionText: Text): OcrResult {
+    private fun toOcrResult(input: OcrInput, visionText: Text, inputImage: InputImage): OcrResult {
+        OcrLogger.logMlKitVisionText(visionText.text)
+        OcrLogger.logMlKitTextStructure(visionText)
+        OcrLogger.logMlKitBboxRegionDistribution(
+            visionText = visionText,
+            ocrWidth = inputImage.width,
+            ocrHeight = inputImage.height,
+        )
         val normalized = try {
             OcrTextNormalizer.fromMlKitText(visionText)
         } catch (error: Exception) {
@@ -68,6 +75,15 @@ class MlKitOcrService(
             )
         }
         val rawText = normalized.rawText.ifBlank { "" }
+
+        OcrLogger.logSnapshotCorrelation(
+            context = context,
+            phase = "after_mlkit_normalize",
+            mlKitTextLength = visionText.text.length,
+            blockCount = normalized.blockCount,
+            candidateLineCount = normalized.rejectedLineCount + normalized.filteredLineCount,
+            acceptedFrameCount = normalized.filteredLineCount,
+        )
 
         return OcrResult(
             rawText = rawText,

@@ -26,9 +26,18 @@ internal object OcrAnalyzerInputFilter {
         val rejectedLines: List<String>,
     )
 
+    data class FilterLineVerdict(
+        val line: String,
+        val verdict: String,
+        val reason: String,
+    )
+
     fun filterLines(lines: List<String>): FilterResult {
+        val verdicts = mutableListOf<FilterLineVerdict>()
+
         if (lines.isEmpty()) {
             return FilterResult(rawText = "", acceptedLines = emptyList(), rejectedLines = emptyList())
+                .also { OcrLogger.logAnalyzerInputFilter(lines, it, verdicts) }
         }
 
         val acceptedByFrame = linkedMapOf<Int, String>()
@@ -37,13 +46,49 @@ internal object OcrAnalyzerInputFilter {
         lines.flatMap { line -> OcrTextNormalizer.splitIntoFrameLines(line) }
             .forEach { candidate ->
                 val normalized = OcrTextNormalizer.normalizeLine(candidate)
-                if (normalized.isEmpty()) return@forEach
+                if (normalized.isEmpty()) {
+                    verdicts.add(
+                        FilterLineVerdict(
+                            line = candidate,
+                            verdict = "SKIP",
+                            reason = "empty_after_normalize",
+                        ),
+                    )
+                    return@forEach
+                }
 
                 val parsed = parseValidFrameLine(normalized)
                 when {
-                    parsed != null -> acceptedByFrame[parsed.frameIndex] = parsed.formattedLine
-                    isIgnorableLine(normalized) -> rejected.add(normalized)
-                    else -> rejected.add(normalized)
+                    parsed != null -> {
+                        acceptedByFrame[parsed.frameIndex] = parsed.formattedLine
+                        verdicts.add(
+                            FilterLineVerdict(
+                                line = normalized,
+                                verdict = "ACCEPT",
+                                reason = "valid_frame_line",
+                            ),
+                        )
+                    }
+                    isIgnorableLine(normalized) -> {
+                        rejected.add(normalized)
+                        verdicts.add(
+                            FilterLineVerdict(
+                                line = normalized,
+                                verdict = "REJECT",
+                                reason = "header_keyword",
+                            ),
+                        )
+                    }
+                    else -> {
+                        rejected.add(normalized)
+                        verdicts.add(
+                            FilterLineVerdict(
+                                line = normalized,
+                                verdict = "REJECT",
+                                reason = diagnoseRejectionReason(normalized),
+                            ),
+                        )
+                    }
                 }
             }
 
@@ -52,7 +97,7 @@ internal object OcrAnalyzerInputFilter {
             rawText = accepted.joinToString("\n"),
             acceptedLines = accepted,
             rejectedLines = rejected,
-        )
+        ).also { OcrLogger.logAnalyzerInputFilter(lines, it, verdicts) }
     }
 
     fun filterRawText(rawText: String): FilterResult {
@@ -107,5 +152,42 @@ internal object OcrAnalyzerInputFilter {
             return HEADER_KEYWORDS.any { lower.contains(it) }
         }
         return false
+    }
+
+    /** ログ出力専用。filterLines の accept/reject 判定には使わない。 */
+    private fun diagnoseRejectionReason(normalized: String): String {
+        val match = FRAME_LINE_REGEX.matchEntire(normalized)
+        if (match == null) {
+            return if (looksLikeFrameLine(normalized)) {
+                "frame_pattern_mismatch"
+            } else {
+                "not_frame_line"
+            }
+        }
+
+        val frameIndex = match.groupValues[1].toIntOrNull()
+        if (frameIndex == null || frameIndex !in 1..10) {
+            return "invalid_frame_index"
+        }
+
+        val rollValues = match.groupValues[2]
+            .split(",")
+            .mapNotNull { segment -> OcrTextNormalizer.parseRollValue(segment) }
+
+        if (rollValues.isEmpty()) {
+            return "no_valid_rolls"
+        }
+
+        val maxRolls = if (frameIndex == 10) 3 else 2
+        val rolls = rollValues.take(maxRolls)
+        return if (isValidRollSequence(frameIndex, rolls)) {
+            "unknown_reject"
+        } else {
+            "invalid_roll_sequence"
+        }
+    }
+
+    private fun looksLikeFrameLine(line: String): Boolean {
+        return Regex("""^[Ff]\s*\d""").containsMatchIn(line)
     }
 }

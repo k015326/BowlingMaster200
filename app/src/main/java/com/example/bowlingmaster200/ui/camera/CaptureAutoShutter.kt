@@ -3,6 +3,7 @@ package com.example.bowlingmaster200.ui.camera
 import android.graphics.ImageFormat
 import android.util.Log
 import androidx.camera.core.ImageAnalysis
+import com.example.bowlingmaster200.BuildConfig
 import androidx.camera.core.ImageProxy
 import com.example.bowlingmaster200.ocr.image.CaptureGuideFrame
 import kotlin.math.abs
@@ -115,6 +116,16 @@ class CaptureAutoShutterAnalyzer(
             if (image.format != ImageFormat.YUV_420_888) return
 
             val metrics = extractMetrics(image) ?: return
+            if (BuildConfig.DEBUG) {
+                Log.d(
+                    "CaptureAutoShutterDebug",
+                    "ink=${metrics.inkRatio} " +
+                        "width=${metrics.contentWidthRatio} " +
+                        "height=${metrics.contentHeightRatio} " +
+                        "offsetX=${metrics.centerOffsetX} " +
+                        "offsetY=${metrics.centerOffsetY}",
+                )
+            }
             val (state, newStableSince) = CaptureAutoShutterEvaluator.evaluate(
                 metrics = metrics,
                 previous = lastMetrics,
@@ -122,6 +133,16 @@ class CaptureAutoShutterAnalyzer(
                 nowMs = now,
                 lastReadyMs = lastReadyMs,
             )
+            if (BuildConfig.DEBUG) {
+                Log.d(
+                    "CaptureAutoShutterDebug",
+                    "positioned=${state.positioned} " +
+                        "stable=${state.stable} " +
+                        "ready=${state.ready} " +
+                        "stableMs=${state.stableProgressMs} " +
+                        "msg=${state.statusMessage}",
+                )
+            }
             lastMetrics = metrics
             stableSinceMs = newStableSince
             if (state.ready) {

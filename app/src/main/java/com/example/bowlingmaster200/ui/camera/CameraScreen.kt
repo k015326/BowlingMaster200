@@ -17,6 +17,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import com.example.bowlingmaster200.BuildConfig
+import com.example.bowlingmaster200.ocr.service.OcrLogger
 import com.example.bowlingmaster200.ocr.service.OcrMlKitInputDebugSnapshot
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -135,6 +136,11 @@ fun CameraScreenContent(
             } else {
                 null
             }
+            OcrLogger.logSnapshotBitmapCorrelation(
+                context = context,
+                phase = "debug_snapshot_open",
+                bitmap = debugSnapshotBitmap,
+            )
         }
         onDispose {
             debugSnapshotBitmap?.recycle()
@@ -189,6 +195,11 @@ fun CameraScreenContent(
         autoShutterPaused = false
         autoShutterAnalyzer.reset()
     }
+
+    Log.d(
+        CAPTURE_AUTO_SHUTTER_DEBUG_TAG,
+        "Compose recomposed ready=${autoShutterState.ready}",
+    )
 
     LaunchedEffect(autoShutterState.ready, uiState.isProcessing, autoShutterPaused, imageCapture) {
         if (autoShutterState.ready) {
@@ -314,7 +325,13 @@ fun CameraScreenContent(
             ) {
                 if (BuildConfig.DEBUG) {
                     OutlinedButton(
-                        onClick = { showDebugSnapshot = true },
+                        onClick = {
+                            OcrLogger.logSnapshotBitmapCorrelation(
+                                context = context,
+                                phase = "debug_snapshot_open_requested",
+                            )
+                            showDebugSnapshot = true
+                        },
                         enabled = hasDebugSnapshot,
                         modifier = Modifier.padding(end = 8.dp),
                     ) {

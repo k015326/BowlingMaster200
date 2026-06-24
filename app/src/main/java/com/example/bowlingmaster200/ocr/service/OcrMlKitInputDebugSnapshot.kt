@@ -36,10 +36,6 @@ object OcrMlKitInputDebugSnapshot {
                     "JPEG compress failed"
                 }
             }
-            OcrLogger.d(
-                "[ML Kit input snapshot] path=${file.absolutePath} " +
-                    "size=${bitmap.width}x${bitmap.height} rotation=$rotationDegrees",
-            )
         } catch (error: Exception) {
             OcrLogger.e("Failed to save ML Kit input snapshot", error)
         }

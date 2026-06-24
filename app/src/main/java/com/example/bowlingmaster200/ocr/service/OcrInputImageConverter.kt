@@ -58,7 +58,18 @@ internal object OcrInputImageConverter {
             val prepared = OcrInputBitmapPipeline.prepareFromOrientedBitmap(oriented)
                 ?: error("OCR bitmap preparation failed")
             val forOcr = prepared.bitmap
+            OcrLogger.logOcrRegionDetail(
+                debugInfo = prepared.debugInfo,
+                outputWidth = forOcr.width,
+                outputHeight = forOcr.height,
+            )
             OcrMlKitInputDebugSnapshot.save(context, forOcr, rotationDegrees = 0)
+            OcrLogger.logSnapshotSaved(context, forOcr)
+            OcrLogger.logSnapshotBitmapCorrelation(
+                context = context,
+                phase = "ocr_mlkit_input",
+                bitmap = forOcr,
+            )
             return InputImage.fromBitmap(forOcr, 0)
         } finally {
             if (oriented !== decoded) {
